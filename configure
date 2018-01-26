@@ -21,8 +21,9 @@ endif
 
 all: libmysqlcb.so.1.0 test
 
+# Omit linking mysql library to prove that libmysqlcb is sufficient without it.
 test: test.cpp libmysqlcb.so.1.0
-	$(CXX) $(CXXFLAGS) -L. -o test test.cpp ${LINK_FLAGS} -Wl,-R -Wl,. -lmysqlcb
+	$(CXX) $(CXXFLAGS) -L. -o test test.cpp -Wl,-R -Wl,. -lmysqlcb
 
 libmysqlcb.so.1.0 : mysqlcb.o binder.o
 	$(CXX) -shared -o libmysqlcb.so.1.0 mysqlcb.o binder.o ${LINK_FLAGS}
