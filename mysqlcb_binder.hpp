@@ -3,10 +3,60 @@
 
 #include <mysql.h>
 #include <stdint.h>  // for uint32_t
+#include <string.h>  // for memcpy()
 #include <iostream>
+
+/**
+ * @brief Simple interface for callback.
+ * @sa Generic_User
+ * @sa @ref Templated_Callbacks
+ */
+template <class T>
+class IGeneric_Callback
+{
+public:
+   virtual ~IGeneric_Callback() { }
+   virtual void operator()(T &t) const = 0;
+};
+
+/**
+ * @brief Generic User class for callbacks with constructed objects.
+ *
+ * @tparam T      Class of the object that will be constructed.
+ * @tparam Func   Function object that takes a reference to a class C object.
+ *
+ * @sa IGeneric_Callback
+ * @sa @ref Templated_Callbacks
+ */
+template <class T, class Func>
+class Generic_User : public IGeneric_Callback<T>
+{
+protected:
+   const Func &m_f;
+public:
+   Generic_User(const Func &f) : m_f(f) { }
+   virtual ~Generic_User()              { }
+   virtual void operator()(T &t) const  { m_f(t); }
+};
+
+
 
 struct Bind_Data;
 
+/**
+ * Base class for basic representation of all data types.
+ *
+ * There are three methods:
+ * - `stream_it()` to facilitate its use with the << operator, and
+ * - 'get_size()` and `set_with_value()` save the data to memory.
+ *   - Use the value from `get_size()` to allocate an appropriately-sized buffer,
+ *     then invoke `set_with_value()` with the buffer and the size of the buffer.
+ *   - For fixed-length data types like numbers, `get_size()` will return
+ *     the appropriate data size.
+ *   - For variable-length data types like strings, the `get_size()` will return a value
+ *     that is 1 greater than the length of the data.  That leaves space to terminate the
+ *     string with a \0.
+ */
 class BDType
 {
 public:
@@ -14,6 +64,20 @@ public:
    virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const = 0;
    virtual size_t get_size(const Bind_Data &bd) const = 0;
    virtual void set_with_value(void* buff, size_t len, const Bind_Data &bd) const = 0;
+   virtual enum_field_types field_type(void) const = 0;
+   virtual bool is_unsigned(void) const = 0;
+};
+
+template <enum_field_types ftype, bool is_unsign=0>
+class BDBase : public BDType
+{
+public:
+   virtual ~BDBase() {}
+   virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const = 0;
+   virtual size_t get_size(const Bind_Data &bd) const = 0;
+   virtual void set_with_value(void* buff, size_t len, const Bind_Data &bd) const = 0;
+   inline virtual enum_field_types field_type(void) const { return ftype; }
+   inline virtual bool is_unsigned(void) const { return is_unsign; }
 };
 
 /**
@@ -35,7 +99,6 @@ struct Bind_Data
    size_t get_size(void)                            { return bdtype->get_size(*this); }
    void set_with_value(void *buff, size_t len_buff) { bdtype->set_with_value(buff,len_buff,*this); }
 };
-
 
 inline std::ostream& operator<<(std::ostream &os, const Bind_Data &obj)
 {
@@ -59,30 +122,23 @@ struct Binder
    Bind_Data   *bind_data;
 };
 
+inline bool is_null(Binder &bd, int index) { return bd.bind_data[index].is_null; }
 
-class IBinder_Callback
-{
-public:
-   virtual ~IBinder_Callback() {}
-   virtual void operator()(Binder &b) const=0;
-};
 
+
+
+using IBinder_Callback = IGeneric_Callback<Binder>;
 template <typename Func>
-class Binder_User : public IBinder_Callback
-{
-protected:
-   const Func &m_f;
-public:
-   Binder_User(const Func &f) : m_f(f)      {}
-   virtual ~Binder_User()                   {}
-   virtual void operator()(Binder &b) const { m_f(b); }
-};
+using Binder_User = Generic_User<Binder,Func>;
 
 uint32_t get_bind_size(MYSQL_FIELD *fld);
 void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt);
 
-template <typename T>
-class BD_Num : public BDType
+/**
+ * Implementation of BDBase for fixed-length types
+ */
+template <typename T, enum_field_types ftype, bool is_unsign=0>
+class BD_Num : public BDBase<ftype,is_unsign>
 {
 public:
    inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const
@@ -100,20 +156,9 @@ public:
    }
 };
 
-using BD_Int32 = BD_Num<int32_t>;
-using BD_UInt32 = BD_Num<uint32_t>;
-using BD_Int16 = BD_Num<int16_t>;
-using BD_UInt16 = BD_Num<uint16_t>;
-using BD_Int8 = BD_Num<int8_t>;
-using BD_UInt8 = BD_Num<uint8_t>;
-using BD_Int64 = BD_Num<int64_t>;
-using BD_UInt64 = BD_Num<uint64_t>;
 
-using BD_Double = BD_Num<double>;
-using BD_Float = BD_Num<float>;
-
-
-class BD_String : public BDType
+template <enum_field_types strtype>
+class BD_String : public BDBase<strtype>
 {
 public:
    inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const

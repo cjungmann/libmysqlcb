@@ -25,7 +25,6 @@ public:
    virtual int operator()(int persist) const { return m_f(persist); }
 };
 
-
 /** ******** */
 struct PullPack
 {
@@ -34,82 +33,68 @@ struct PullPack
    IPuller_Callback &puller;
 };
 
-/** ***************** */
-class IPullPack_Callback
+using IPullPack_Callback = IGeneric_Callback<PullPack>;
+template <typename Func>
+using PullPack_User = Generic_User<PullPack,Func>;
+
+
+/**
+ * The function-call method of Query_Callback takes two parameters,
+ * a callback AND a const char*, so it needs new template.
+ *
+ * Thus, IQuery_Callback and Query_User are template classes for
+ * IPullQuery_Callback and PullQuery_User and
+ * IPushQuery_Callback and PushQuery_User.
+ */
+template <class CB>
+class IQuery_Callback
 {
 public:
-   virtual ~IPullPack_Callback() {}
-   virtual void operator()(PullPack &b) const=0;
+   virtual ~IQuery_Callback() {}
+   virtual void operator()(CB &cb, const char *query) const = 0;
 };
 
-/** ***************** */
-template <typename Func>
-class PullPack_User : public IPullPack_Callback
+template <class CB, typename Func>
+class Query_User : public IQuery_Callback<CB>
 {
 protected:
    const Func &m_f;
 public:
-   PullPack_User(const Func &f) : m_f(f)      {}
-   virtual ~PullPack_User()                   {}
-   virtual void operator()(PullPack &b) const { m_f(b); }
-};
-
-/** ****************** */
-class IPullQuery_Callback
-{
-public:
-   virtual ~IPullQuery_Callback() {}
-   virtual void operator()(IPullPack_Callback &cb, const char *query, ...) const = 0;
-};
-
-template <typename Func>
-class PullQuery_User : public IPullQuery_Callback
-{
-protected:
-   const Func &m_f;
-public:
-   PullQuery_User(Func &f) : m_f(f) {}
-   virtual ~PullQuery_User()       {}
-   virtual void operator()(IPullPack_Callback &cb, const char *query, ...) const
+   Query_User(Func &f) : m_f(f) {}
+   virtual ~Query_User()        {}
+   virtual void operator()(CB &cb, const char *query) const
    {
-      va_list arglist;
-      va_start(arglist, query);
-      m_f(cb, query, arglist);
-      va_end(arglist);
+      m_f(cb,query);
    }
 };
 
-/** ****************** */
-class IPushQuery_Callback
-{
-public:
-   virtual ~IPushQuery_Callback() {}
-   virtual void operator()(IBinder_Callback &cb, const char *query, ...) const = 0;
-};
-
-/** ****************** */
+using IPullQuery_Callback = IQuery_Callback<IPullPack_Callback>;
 template <typename Func>
-class PushQuery_User : public IPushQuery_Callback
-{
-protected:
-   const Func &m_f;
-public:
-   PushQuery_User(Func &f) : m_f(f) {}
-   virtual ~PushQuery_User()        {}
-   virtual void operator()(IBinder_Callback &cb, const char *query, ...) const
-   {
-      va_list arglist;
-      va_start(arglist, query);
-      m_f(cb, query, arglist);
-      va_end(arglist);
-   }
-};
+using PullQuery_User = Query_User<IPullPack_Callback, Func>;
+
+using IPushQuery_Callback = IQuery_Callback<IBinder_Callback>;
+template <typename Func>
+using PushQuery_User = Query_User<IBinder_Callback, Func>;
 
 struct Querier_Pack
 {
    const IPushQuery_Callback &pushcb;
    const IPullQuery_Callback &pullcb;
 };
+
+template <typename Func>
+inline void push(const Querier_Pack &qp, Func f, const char *query)
+{
+   Binder_User<Func> bu(f);
+   qp.pushcb(bu, query);
+}
+
+template <typename Func>
+inline void pull(const Querier_Pack &qp, Func f, const char *query)
+{
+   PullPack_User<Func> pu(f);
+   qp.pullcb(pu, query);
+}
 
 /** **************** */
 class IQuerier_Callback
@@ -206,30 +191,42 @@ typedef void (*pullpack_callback)(PullPack &p);
  * whose second parameters are either a template class or a callback function.
  */
 
-void execute_query(MYSQL &mysql, IBinder_Callback &cb, const char *query, va_list list=nullptr);
+void execute_query(MYSQL &mysql, IBinder_Callback &cb, const char *query);
 
 /**
  * Call execute_query callback function.
  *
  * Internally this function calls the lambda function, which is more flexible.
  */
-inline void execute_query(MYSQL &mysql, binder_callback cb, const char *query, va_list list=nullptr)
+inline void execute_query(MYSQL &mysql, binder_callback cb, const char *query)
 {
    Binder_User<binder_callback> bu(cb);
-   execute_query(mysql, bu, query, list);
+   execute_query(mysql, bu, query);
 }
 
-void execute_query_pull(MYSQL &mysql, IPullPack_Callback &cb, const char *query, va_list list=nullptr);
-inline void execute_query_pull(MYSQL &mysql, pullpack_callback cb, const char *query, va_list list=nullptr)
+void execute_query_pull(MYSQL &mysql, IPullPack_Callback &cb, const char *query);
+inline void execute_query_pull(MYSQL &mysql, pullpack_callback cb, const char *query)
 {
    PullPack_User<pullpack_callback> bu(cb);
-   execute_query_pull(mysql, bu, query, list);
+   execute_query_pull(mysql, bu, query);
 }
 
-void start_mysql(IConnection_Callback &cb,
+void t_start_mysql(IConnection_Callback &cb,
+                   const char *host=nullptr,
+                   const char *user=nullptr,
+                   const char *pass=nullptr,
+                   const char *dbase=nullptr);
+
+template <typename Func>
+void start_mysql(Func &cb,
                  const char *host=nullptr,
                  const char *user=nullptr,
-                 const char *pass=nullptr);
+                 const char *pass=nullptr,
+                 const char *dbase=nullptr)
+{
+   Connection_User<Func> cu(cb);
+   t_start_mysql(cu,host,user,pass,dbase);
+}
 
 
 

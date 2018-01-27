@@ -16,7 +16,7 @@
  *
  * @return void
  */
-void execute_query(MYSQL &mysql, IBinder_Callback &cb, const char *query, va_list vlist)
+void execute_query(MYSQL &mysql, IBinder_Callback &cb, const char *query)
 {
    MYSQL_STMT *stmt = mysql_stmt_init(&mysql);
    if (stmt)
@@ -69,7 +69,7 @@ void execute_query(MYSQL &mysql, IBinder_Callback &cb, const char *query, va_lis
  *
  * @return void
  */
-void execute_query_pull(MYSQL &mysql, IPullPack_Callback &cb, const char *query, va_list list)
+void execute_query_pull(MYSQL &mysql, IPullPack_Callback &cb, const char *query)
 {
    MYSQL_STMT *stmt = mysql_stmt_init(&mysql);
    if (stmt)
@@ -122,14 +122,17 @@ void execute_query_pull(MYSQL &mysql, IPullPack_Callback &cb, const char *query,
       std::cerr << "Failed to initialize the statement." << std::endl;
 }
 
-void start_mysql(IConnection_Callback &cb, const char *host, const char *user, const char *pass)
+void t_start_mysql(IConnection_Callback &cb,
+                   const char *host,
+                   const char *user,
+                   const char *pass,
+                   const char *dbase)
 {
    MYSQL mysql;
    bool  in_query = false;
    static const char msg_osync[] = "Old query must run to completion before start a new query.\n";
 
    // remainder of mysql_real_connect arguments:
-   const char    *db = "information_schema";
    int           port = 0;
    const char    *socket = nullptr;
    unsigned long client_flag = 0;
@@ -140,13 +143,13 @@ void start_mysql(IConnection_Callback &cb, const char *host, const char *user, c
       mysql_options(&mysql,MYSQL_READ_DEFAULT_GROUP,"client");
 
       MYSQL *handle = mysql_real_connect(&mysql,
-                                         host, user, pass, db,
+                                         host, user, pass, dbase,
                                          port, socket, client_flag);
 
       if (handle)
       {
 
-         auto fpusher = [&mysql, &in_query](IBinder_Callback &cb, const char *query, va_list args) -> void
+         auto fpusher = [&mysql, &in_query](IBinder_Callback &cb, const char *query) -> void
             {
                if (in_query)
                {
@@ -155,13 +158,13 @@ void start_mysql(IConnection_Callback &cb, const char *host, const char *user, c
                else
                {
                   in_query = true;
-                  execute_query(mysql, cb, query, args);
+                  execute_query(mysql, cb, query);
                   in_query = false;
                }
             };
          PushQuery_User<decltype(fpusher)> pushercb(fpusher);
 
-         auto fpuller = [&mysql, &in_query](IPullPack_Callback &cb, const char *query, va_list args) -> void
+         auto fpuller = [&mysql, &in_query](IPullPack_Callback &cb, const char *query) -> void
             {
                if (in_query)
                {
@@ -170,13 +173,13 @@ void start_mysql(IConnection_Callback &cb, const char *host, const char *user, c
                else
                {
                   in_query = true;
-                  execute_query_pull(mysql, cb, query, args);
+                  execute_query_pull(mysql, cb, query);
                   in_query = false;
                }
             };
          PullQuery_User<decltype(fpuller)> pullercb(fpuller);
 
-      
+
          Querier_Pack qp = {pushercb, pullercb};
 
          cb(qp);
