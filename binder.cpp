@@ -6,56 +6,50 @@
 #include "mysqlcb_binder.hpp"
 using namespace std;
 
-const BD_Num<int32_t> g_bd_int32;
-const BD_Num<uint32_t> g_bd_uint32;
+const BD_Num<int32_t, MYSQL_TYPE_LONG> bd_Int32;
+const BD_Num<uint32_t, MYSQL_TYPE_LONG, 1> bd_UInt32;
+const BD_Num<int16_t, MYSQL_TYPE_SHORT> bd_Int16;
+const BD_Num<uint16_t, MYSQL_TYPE_SHORT, 1> bd_UInt16;
+const BD_Num<int8_t, MYSQL_TYPE_TINY> bd_Int8;
+const BD_Num<uint8_t, MYSQL_TYPE_TINY, 1> bd_UInt8;
+const BD_Num<int64_t, MYSQL_TYPE_LONGLONG> bd_Int64;
+const BD_Num<uint64_t, MYSQL_TYPE_LONGLONG, 1> bd_UInt64;
 
-const BD_String  g_bd_string;
+const BD_Num<double, MYSQL_TYPE_DOUBLE> bd_Double;
+const BD_Num<float, MYSQL_TYPE_FLOAT> bd_Float;
 
+const BD_String<MYSQL_TYPE_VAR_STRING> bd_VarString;
+const BD_String<MYSQL_TYPE_STRING> bd_String;
+const BD_String<MYSQL_TYPE_BLOB> bd_Blob;
+
+
+const BDType *typerefs[] = {
+   &bd_Int32,
+   &bd_UInt32,
+   &bd_Int16,
+   &bd_UInt16,
+   &bd_Int8,
+   &bd_UInt8,
+   &bd_Int64,
+   &bd_UInt64,
+   &bd_VarString,
+   &bd_String,
+   &bd_Blob,
+
+   nullptr
+};
 
 const BDType *get_bdtype(const MYSQL_FIELD &fld)
 {
-   bool is_unsigned = (fld.flags & UNSIGNED_FLAG) !=0;
-   switch(fld.type)
+   enum_field_types ftype = fld.type;
+   const BDType **ptr = typerefs;
+   while(*ptr)
    {
-      case MYSQL_TYPE_DECIMAL:
-      case MYSQL_TYPE_TINY:
-      case MYSQL_TYPE_SHORT:
-      case MYSQL_TYPE_LONG:
-         if (is_unsigned)
-            return &g_bd_uint32;
-         else
-            return &g_bd_int32;
-      case MYSQL_TYPE_FLOAT:
-      case MYSQL_TYPE_DOUBLE:
-      case MYSQL_TYPE_NULL:
-      case MYSQL_TYPE_TIMESTAMP:
-      case MYSQL_TYPE_LONGLONG:
-      case MYSQL_TYPE_INT24:
-      case MYSQL_TYPE_DATE:
-      case MYSQL_TYPE_TIME:
-      case MYSQL_TYPE_DATETIME:
-      case MYSQL_TYPE_YEAR:
-      case MYSQL_TYPE_NEWDATE:
-      case MYSQL_TYPE_VARCHAR:
-      case MYSQL_TYPE_BIT:
-      case MYSQL_TYPE_TIMESTAMP2:
-      case MYSQL_TYPE_DATETIME2:
-      case MYSQL_TYPE_TIME2:
-      case MYSQL_TYPE_JSON:
-      case MYSQL_TYPE_NEWDECIMAL:
-      case MYSQL_TYPE_ENUM:
-      case MYSQL_TYPE_SET:
-      case MYSQL_TYPE_TINY_BLOB:
-      case MYSQL_TYPE_MEDIUM_BLOB:
-      case MYSQL_TYPE_LONG_BLOB:
-      case MYSQL_TYPE_BLOB:
-      case MYSQL_TYPE_VAR_STRING:
-         return &g_bd_string;
-      case MYSQL_TYPE_STRING:
-      case MYSQL_TYPE_GEOMETRY:
-         break;
-   }
-
+      if ((*ptr)->field_type()==ftype)
+         return *ptr;
+      ++ptr;
+   };
+   
    return nullptr;
 }
 
@@ -117,9 +111,25 @@ void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt)
             Bind_Data  &bdataInst = bdata[i];
             set_bind_pointers_to_data_members(bind, bdataInst);
             set_bind_values_from_field(bind, field);
-            bdataInst.bdtype = get_bdtype(field);
+            const BDType *bdtype = bdataInst.bdtype = get_bdtype(field);
 
-            uint32_t buffer_length = get_buffer_size(fields[i]);
+            if (!bdtype)
+            {
+               static const char *unp = " unprepared field type.";
+               static const int len_unp = strlen(unp);
+
+               int len = strlen(field.name);
+               char *buff = static_cast<char*>(alloca(len+len_unp+1));
+               char *ptr = buff;
+               memcpy(ptr, field.name, len);
+               ptr += len;
+               memcpy(ptr, unp, len_unp);
+               ptr[len_unp] = '\0';
+               throw std::runtime_error(ptr);
+            }
+
+            // uint32_t buffer_length = get_buffer_size(fields[i]);
+            uint32_t buffer_length = bdtype->get_size(bdataInst);
 
             if (buffer_length>1024)
                buffer_length = 2014;
