@@ -63,20 +63,28 @@ public:
    virtual ~BDType() {}
    virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const = 0;
    virtual size_t get_size(const Bind_Data &bd) const = 0;
-   virtual void set_with_value(void* buff, size_t len, const Bind_Data &bd) const = 0;
+   virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const = 0;
    virtual enum_field_types field_type(void) const = 0;
+   virtual const char *type_name(void) const = 0;
+
    virtual bool is_unsigned(void) const = 0;
 };
 
 template <enum_field_types ftype, bool is_unsign=0>
 class BDBase : public BDType
 {
+protected:
+   const char *m_type_name;
 public:
+   BDBase(const char* tname) : m_type_name(tname) {}
    virtual ~BDBase() {}
+   BDBase(const BDBase&) = delete;
+   BDBase& operator=(const BDBase&) = delete;
    virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const = 0;
    virtual size_t get_size(const Bind_Data &bd) const = 0;
-   virtual void set_with_value(void* buff, size_t len, const Bind_Data &bd) const = 0;
+   virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const = 0;
    inline virtual enum_field_types field_type(void) const { return ftype; }
+   inline virtual const char *type_name(void) const { return m_type_name; }
    inline virtual bool is_unsigned(void) const { return is_unsign; }
 };
 
@@ -97,7 +105,7 @@ struct Bind_Data
 
    
    size_t get_size(void)                            { return bdtype->get_size(*this); }
-   void set_with_value(void *buff, size_t len_buff) { bdtype->set_with_value(buff,len_buff,*this); }
+   void set_with_value(void *buff, size_t len_buff) { bdtype->set_with_value(*this,buff,len_buff); }
 };
 
 inline std::ostream& operator<<(std::ostream &os, const Bind_Data &obj)
@@ -122,7 +130,21 @@ struct Binder
    Bind_Data   *bind_data;
 };
 
-inline bool is_null(Binder &bd, int index) { return bd.bind_data[index].is_null; }
+inline const Bind_Data& get_bind_data(const Binder &b, int index) { return b.bind_data[index]; }
+inline const BDType& get_bdtype(const Binder &b, int index) { return *get_bind_data(b,index).bdtype; }
+inline const BDType& get_streamable(const Binder &b, int index) { return get_bdtype(b,index); }
+inline bool is_null(const Binder &b, int index) { return get_bind_data(b,index).is_null; }
+inline const char *type_name(const Binder &b, int index) { return get_bdtype(b,index).type_name(); }
+inline const size_t get_size(const Binder &b, int index)
+{
+   const Bind_Data &bd = get_bind_data(b,index);
+   return bd.bdtype->get_size(bd);
+}
+inline void set_with_value(const Binder &b, int index, void *buff, size_t len)
+{
+   const Bind_Data &bd = get_bind_data(b,index);
+   bd.bdtype->set_with_value(bd, buff, len);
+}
 
 
 
@@ -141,6 +163,7 @@ template <typename T, enum_field_types ftype, bool is_unsign=0>
 class BD_Num : public BDBase<ftype,is_unsign>
 {
 public:
+   BD_Num(const char *tname) : BDBase<ftype,is_unsign>(tname) { }
    inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const
    {
       os << *static_cast<T*>(bd.data);
@@ -150,7 +173,7 @@ public:
    {
       return sizeof(T);
    }
-   inline virtual void set_with_value(void* buff, size_t len, const Bind_Data &bd) const
+   inline virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const
    {
       memcpy(buff, bd.data, sizeof(T));
    }
@@ -161,6 +184,7 @@ template <enum_field_types strtype>
 class BD_String : public BDBase<strtype>
 {
 public:
+   BD_String(const char *tname) : BDBase<strtype>(tname) { }
    inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const
    {
       os.write(static_cast<const char*>(bd.data), bd.len_data);
@@ -171,7 +195,7 @@ public:
    {
       return bd.len_data+1;
    }
-   inline virtual void set_with_value(void* buff, size_t len, const Bind_Data &bd) const
+   inline virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const
    {
       memcpy(buff, bd.data, bd.len_data);
       if (len > bd.len_data)
