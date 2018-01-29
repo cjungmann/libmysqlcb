@@ -122,9 +122,14 @@ inline bool is_unsupported_type(const Bind_Data& bd) { return bd.bdtype==nullptr
 inline uint32_t required_buffer_size(const Bind_Data& bd) { return bd.bdtype->get_size(bd); }
 
 inline size_t get_size(const Bind_Data &bd) { return bd.bdtype->get_size(bd); }
+inline size_t get_size(const Bind_Data *bd) { return bd->bdtype->get_size(*bd); }
 inline void set_with_value(const Bind_Data &bd, void *buff, size_t len_buff)
 {
    bd.bdtype->set_with_value(bd, buff, len_buff);
+}
+inline void set_with_value(const Bind_Data *bd, void *buff, size_t len_buff)
+{
+   bd->bdtype->set_with_value(*bd, buff, len_buff);
 }
 
 inline const char * field_name(const Bind_Data &bd) { return bd.field->name; }
