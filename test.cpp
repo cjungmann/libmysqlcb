@@ -1,7 +1,5 @@
 #include <mysql.h>
 #include <iostream>
-#include <string.h>  // For strlen()
-#include <stdint.h>  // for uint32_t
 
 using namespace std;
 
@@ -48,6 +46,16 @@ void use_mysql_puller(MYSQL &mysql)
    execute_query_pull(mysql, pu, "SELECT SCHEMA_NAME FROM SCHEMATA");
 }
 
+void xmlify(Binder &b)
+{
+   cout << "<row";
+   for (uint32_t i=0; i<b.field_count; ++i)
+   {
+      cout << " " <<  b.fields[i].name << "=\"" << b.bind_data[i] << "\"";
+   }
+   cout << "/>\n";
+}
+
 
 void start_app(void)
 {
@@ -62,7 +70,7 @@ void start_app(void)
          std::cout << bdata << std::endl;
       }
    };
-   PullPack_User<decltype(fpuller)> pu(fpuller);
+   // PullPack_User<decltype(fpuller)> pu(fpuller);
 
 
    /** Pusher method user lambda **/
@@ -73,21 +81,18 @@ void start_app(void)
          cout << b.fields[i].name << ": " << static_cast<const char*>(b.binds[i].buffer) << endl;
       }
    };
-   Binder_User<decltype(fpusher)> bu(fpusher);
-
+   // Binder_User<decltype(fpusher)> bu(fpusher);
 
    /** Pusher method callback lambda **/
-   auto fqp = [&pu, &bu](Querier_Pack &qp)
+   auto fqp = [&fpusher, &fpuller](Querier_Pack &qp)
    {
-      qp.pullcb(pu, "SELECT SCHEMA_NAME FROM SCHEMATA");
-      qp.pushcb(bu, "SELECT SCHEMA_NAME FROM SCHEMATA");
-   };
-   
-   /** Push method start_mysql user callback **/
-   Connection_User<decltype(fqp)> cu(fqp);
-   
+      start_pull(qp, fpuller, "SELECT SCHEMA_NAME FROM SCHEMATA");
+      start_push(qp, fpusher, "SELECT SCHEMA_NAME FROM SCHEMATA");
 
-   start_mysql(cu);
+      start_push(qp, xmlify, "SELECT SCHEMA_NAME FROM SCHEMATA");
+   };
+
+   start_mysql(fqp);
 }
   
 
@@ -95,7 +100,6 @@ void start_app(void)
 
 int main(int argc, char **argv)
 {
-   // start_mysql();
    start_app();
    return 0;
 }
