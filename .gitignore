@@ -1,7 +1,7 @@
 configure
-html
 libmysqlcb*
 Makefile
+sqldrill
 test
 xmlify
 *.o
