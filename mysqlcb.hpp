@@ -83,14 +83,14 @@ struct Querier_Pack
 };
 
 template <typename Func>
-inline void push(const Querier_Pack &qp, Func f, const char *query)
+inline void start_push(const Querier_Pack &qp, Func f, const char *query)
 {
    Binder_User<Func> bu(f);
    qp.pushcb(bu, query);
 }
 
 template <typename Func>
-inline void pull(const Querier_Pack &qp, Func f, const char *query)
+inline void start_pull(const Querier_Pack &qp, Func f, const char *query)
 {
    PullPack_User<Func> pu(f);
    qp.pullcb(pu, query);
@@ -169,7 +169,7 @@ public:
 // Function pointer callback that works like IBinder_Callback
 typedef void (*binder_callback)(Binder &b);
 typedef void (*pullpack_callback)(PullPack &p);
-
+/** @file */
 
 /**
  * Functions for getting mysql rows.
