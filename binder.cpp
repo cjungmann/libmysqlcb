@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string.h>
 #include <alloca.h>
+#include <assert.h>
 #include "mysqlcb.hpp"
 #include "mysqlcb_binder.hpp"
 using namespace std;
@@ -54,13 +55,6 @@ const BDType *get_bdtype(const MYSQL_FIELD &fld)
 }
 
 
-void set_bind_pointers_to_data_members(MYSQL_BIND &b, Bind_Data &d)
-{
-   b.length = &d.len_data;
-   b.is_null = &d.is_null;
-   b.error = &d.is_error;
-}
-
 uint32_t get_buffer_size(const MYSQL_FIELD &fld)
 {
    switch (fld.type)
@@ -82,11 +76,34 @@ uint32_t get_buffer_size(const MYSQL_FIELD &fld)
    }
 }
 
+/**
+ * @brief Attaches addresses to pointers of MYSQL_BIND struct.
+ *
+ * Note that this must be done before set_bind_values_from_field() or
+ * the pointers that function uses will be invalid.
+ */
+void set_bind_pointers_to_data_members(MYSQL_BIND &b, Bind_Data &d)
+{
+   b.length = &d.len_data;
+   b.is_null = &d.is_null;
+   b.error = &d.is_error;
+}
+
 void set_bind_values_from_field(MYSQL_BIND &b, const MYSQL_FIELD &f)
 {
+   // set_bind_pointers_to_data_members() must be called first.
+   assert(b.length);
+
    b.buffer_type = f.type;
    b.is_unsigned = (f.flags & UNSIGNED_FLAG)!=0;
    *b.length = get_buffer_size(f);
+}
+
+void set_bind_data_object_pointers(Bind_Data &bd, MYSQL_FIELD &field, MYSQL_BIND &bind)
+{
+   bd.field = &field;
+   bd.bind = &bind;
+   bd.bdtype = get_bdtype(field);
 }
 
 void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt)
@@ -99,21 +116,23 @@ void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt)
       {
          MYSQL_FIELD *fields = mysql_fetch_fields(result);
          MYSQL_BIND  *binds = static_cast<MYSQL_BIND*>(alloca(sizeof(MYSQL_BIND) * fcount));
-         Bind_Data   *bdata = static_cast<Bind_Data*>(alloca(sizeof(Bind_Data) * fcount));
+         // Make one extra Bind_Data element, set to NULL, to signal the end of the list.
+         Bind_Data   *bdata = static_cast<Bind_Data*>(alloca(sizeof(Bind_Data) * (fcount+1)));
 
          memset(binds, 0, sizeof(MYSQL_BIND)*fcount);
-         memset(bdata, 0, sizeof(Bind_Data)*fcount);
+         memset(bdata, 0, sizeof(Bind_Data)*(fcount+1));
 
          for (uint32_t i=0; i<fcount; ++i)
          {
+            Bind_Data  &bdataInst = bdata[i];
             MYSQL_FIELD &field = fields[i];
             MYSQL_BIND &bind = binds[i];
-            Bind_Data  &bdataInst = bdata[i];
+
             set_bind_pointers_to_data_members(bind, bdataInst);
             set_bind_values_from_field(bind, field);
-            const BDType *bdtype = bdataInst.bdtype = get_bdtype(field);
+            set_bind_data_object_pointers(bdataInst, field, bind);
 
-            if (!bdtype)
+            if (is_unsupported_type(bdataInst))
             {
                static const char *unp = " unprepared field type.";
                static const int len_unp = strlen(unp);
@@ -129,10 +148,10 @@ void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt)
             }
 
             // uint32_t buffer_length = get_buffer_size(fields[i]);
-            uint32_t buffer_length = bdtype->get_size(bdataInst);
+            uint32_t buffer_length = required_buffer_size(bdataInst);
 
             if (buffer_length>1024)
-               buffer_length = 2014;
+               buffer_length = 1024;
 
             // alloca must be in this scope to persist until callback:
             bind.buffer = bdata[i].data = static_cast<void*>(alloca(buffer_length));

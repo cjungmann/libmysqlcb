@@ -80,9 +80,9 @@ public:
    virtual ~BDBase() {}
    BDBase(const BDBase&) = delete;
    BDBase& operator=(const BDBase&) = delete;
-   virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const = 0;
-   virtual size_t get_size(const Bind_Data &bd) const = 0;
-   virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const = 0;
+   virtual        std::ostream&   stream_it(std::ostream &os, const Bind_Data &bd) const = 0;
+   virtual        size_t          get_size(const Bind_Data &bd) const = 0;
+   virtual        void            set_with_value(const Bind_Data &bd, void* buff, size_t len) const = 0;
    inline virtual enum_field_types field_type(void) const { return ftype; }
    inline virtual const char *type_name(void) const { return m_type_name; }
    inline virtual bool is_unsigned(void) const { return is_unsign; }
@@ -99,13 +99,11 @@ struct Bind_Data
    void          *data;
    my_bool       is_error;
 
-   // The final member is true for long strings that must be paged out:
    bool          is_truncated;
-   const BDType  *bdtype;
 
-   
-   size_t get_size(void)                            { return bdtype->get_size(*this); }
-   void set_with_value(void *buff, size_t len_buff) { bdtype->set_with_value(*this,buff,len_buff); }
+   MYSQL_FIELD   *field;
+   MYSQL_BIND    *bind;
+   const BDType  *bdtype;
 };
 
 inline std::ostream& operator<<(std::ostream &os, const Bind_Data &obj)
@@ -113,9 +111,33 @@ inline std::ostream& operator<<(std::ostream &os, const Bind_Data &obj)
    return obj.bdtype->stream_it(os, obj);
 }
 
+inline std::ostream& operator<<(std::ostream &os, const Bind_Data *obj)
+{
+   return obj->bdtype->stream_it(os, *obj);
+}
+
+inline bool valid(const Bind_Data &bd) { return bd.field != nullptr; }
+inline bool valid(const Bind_Data *bd) { return bd->field != nullptr; }
+inline bool is_unsupported_type(const Bind_Data& bd) { return bd.bdtype==nullptr; }
+inline uint32_t required_buffer_size(const Bind_Data& bd) { return bd.bdtype->get_size(bd); }
+
+inline size_t get_size(const Bind_Data &bd) { return bd.bdtype->get_size(bd); }
+inline void set_with_value(const Bind_Data &bd, void *buff, size_t len_buff)
+{
+   bd.bdtype->set_with_value(bd, buff, len_buff);
+}
+
+inline const char * field_name(const Bind_Data &bd) { return bd.field->name; }
+inline const char * field_name(const Bind_Data *bd) { return bd->field->name; }
+inline const char * type_name(const Bind_Data &bd) { return bd.bdtype->type_name(); }
+inline const char * type_name(const Bind_Data *bd) { return bd->bdtype->type_name(); }
+inline bool is_null(const Bind_Data &bd) { return bd.is_null; }
+inline bool is_null(const Bind_Data *bd) { return bd->is_null; }
+
+
 
 /**
- * Bundle of Field information, collected from mysql_stmt_result_metadata.
+ * bundle of Field information, collected from mysql_stmt_result_metadata.
  *
  * This structure is passed to a callback function each time a row is fetched
  * from a query.
@@ -130,21 +152,21 @@ struct Binder
    Bind_Data   *bind_data;
 };
 
-inline const Bind_Data& get_bind_data(const Binder &b, int index) { return b.bind_data[index]; }
-inline const BDType& get_bdtype(const Binder &b, int index) { return *get_bind_data(b,index).bdtype; }
-inline const BDType& get_streamable(const Binder &b, int index) { return get_bdtype(b,index); }
-inline bool is_null(const Binder &b, int index) { return get_bind_data(b,index).is_null; }
-inline const char *type_name(const Binder &b, int index) { return get_bdtype(b,index).type_name(); }
-inline const size_t get_size(const Binder &b, int index)
-{
-   const Bind_Data &bd = get_bind_data(b,index);
-   return bd.bdtype->get_size(bd);
-}
-inline void set_with_value(const Binder &b, int index, void *buff, size_t len)
-{
-   const Bind_Data &bd = get_bind_data(b,index);
-   bd.bdtype->set_with_value(bd, buff, len);
-}
+// inline const Bind_Data& get_bind_data(const Binder &b, int index) { return b.bind_data[index]; }
+// inline const BDType& get_bdtype(const Binder &b, int index) { return *get_bind_data(b,index).bdtype; }
+// inline const BDType& get_streamable(const Binder &b, int index) { return get_bdtype(b,index); }
+// inline bool is_null(const Binder &b, int index) { return get_bind_data(b,index).is_null; }
+// inline const char *type_name(const Binder &b, int index) { return get_bdtype(b,index).type_name(); }
+// inline const size_t get_size(const Binder &b, int index)
+// {
+//    const Bind_Data &bd = get_bind_data(b,index);
+//    return bd.bdtype->get_size(bd);
+// }
+// inline void set_with_value(const Binder &b, int index, void *buff, size_t len)
+// {
+//    const Bind_Data &bd = get_bind_data(b,index);
+//    bd.bdtype->set_with_value(bd, buff, len);
+// }
 
 
 
