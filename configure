@@ -19,7 +19,7 @@ ifndef PREFIX
 	PREFIX := /usr/local
 endif
 
-all: libmysqlcb.so.1.0 test xmlify
+all: libmysqlcb.so.1.0 test xmlify sqldrill
 
 # Omit linking mysql library to prove that libmysqlcb is sufficient without it.
 test: test.cpp libmysqlcb.so.1.0
@@ -27,6 +27,9 @@ test: test.cpp libmysqlcb.so.1.0
 
 xmlify: xmlify.cpp libmysqlcb.so.1.0
 	$(CXX) $(CXXFLAGS) -L. -o xmlify xmlify.cpp -Wl,-R -Wl,. -lmysqlcb
+
+sqldrill: sqldrill.cpp libmysqlcb.so.1.0
+	$(CXX) $(CXXFLAGS) -L. -o sqldrill sqldrill.cpp ${LINK_FLAGS} -Wl,-R -Wl,. -lmysqlcb
 
 libmysqlcb.so.1.0 : mysqlcb.o binder.o
 	$(CXX) -shared -o libmysqlcb.so.1.0 mysqlcb.o binder.o ${LINK_FLAGS}
