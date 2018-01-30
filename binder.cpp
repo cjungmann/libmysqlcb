@@ -112,6 +112,16 @@ void set_bind_values_from_field(MYSQL_BIND &b, const MYSQL_FIELD &f)
    *b.length = get_buffer_size(f);
 }
 
+void set_bind_values(MYSQL_BIND &b, const BaseParam &param)
+{
+   // set_bind_pointers_to_data_members() must be called first.
+   assert(b.length);
+
+   b.buffer_type = param.field_type();
+   b.is_unsigned = param.is_unsigned();
+   *(b.length) = param.get_size();
+}
+
 void set_bind_data_object_pointers(Bind_Data &bd, MYSQL_FIELD &field, MYSQL_BIND &bind)
 {
    bd.field = &field;
@@ -181,4 +191,58 @@ void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt)
          cerr << "Error getting result metadata." << endl;
       }
    }
+}
+
+void summon_binder(IBinder_Callback &cb, ...)
+{
+   va_list args;
+   va_start(args, cb);
+
+   va_list counter;
+   va_copy(counter, args);
+   int count = 0;
+   while(1)
+   {
+      const BaseParam &bp = va_arg(counter, BaseParam);
+      if (bp.is_void())
+         break;
+      else
+         ++count;
+   }
+   va_end(counter);
+
+   MYSQL_BIND *binds = static_cast<MYSQL_BIND*>(alloca(count * sizeof(MYSQL_BIND)));
+   memset(static_cast<void*>(binds), 0, count*sizeof(MYSQL_BIND));
+
+   Bind_Data *bind_data = static_cast<Bind_Data*>(alloca(count+1 * sizeof(Bind_Data)));
+   memset(static_cast<void*>(bind_data), 0, count+1 * sizeof(Bind_Data));
+
+   Binder binder = { static_cast<uint32_t>(count), nullptr, binds, bind_data };
+   
+   MYSQL_BIND *p_bind = binds;
+   Bind_Data *p_data = bind_data;
+   while(1)
+   {
+      const BaseParam &param = va_arg(args, BaseParam);
+      if (param.is_void())
+         break;
+      else
+      {
+         set_bind_pointers_to_data_members(*p_bind, *p_data);
+         set_bind_values(*p_bind, param);
+         p_data->bind = p_bind;
+
+         // uint32_t buffer_length = get_buffer_size(fields[i]);
+         uint32_t buffer_length = param.get_size();
+
+         // alloca must be in this scope to persist until callback:
+         void *data = alloca(buffer_length);
+         memcpy(data, param.data(), buffer_length);
+         p_bind->buffer = p_data->data = data;
+         p_bind->buffer_length = buffer_length;
+      }
+   }
+   va_end(args);
+
+   cb(binder);
 }
