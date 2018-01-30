@@ -158,7 +158,7 @@ struct Binder
    Bind_Data   *bind_data;
 };
 
-// inline const Bind_Data& get_bind_data(const Binder &b, int index) { return b.bind_data[index]; }
+// inline const Bind_Data& get_bind_data(const Binder &b, int index { return b.bind_data[index]; }
 // inline const BDType& get_bdtype(const Binder &b, int index) { return *get_bind_data(b,index).bdtype; }
 // inline const BDType& get_streamable(const Binder &b, int index) { return get_bdtype(b,index); }
 // inline bool is_null(const Binder &b, int index) { return get_bind_data(b,index).is_null; }
@@ -233,8 +233,53 @@ public:
 };
 
 
+extern const BD_String<MYSQL_TYPE_VAR_STRING> bd_VarString;
+const BDType *get_bdtype(const MYSQL_FIELD &fld);
+const BDType *get_bdtype(const char *name);
 
+/** */
+class BaseParam
+{
+protected:
+   size_t       m_len;
+   const void   *m_data;
+   const BDType *m_type;
+public:
+   BaseParam(const void *d, size_t len, const BDType *type)
+      : m_len(len), m_data(d), m_type(type){}
+   bool is_void(void) const                { return m_data==nullptr && m_type==nullptr; }
 
+   size_t       len(void) const            { return m_len; }
+   size_t  get_size(void) const            { return m_len; }
+   const void*  data(void) const           { return m_data; }
+   const BDType &type(void) const          { return *m_type; }
+   enum_field_types field_type(void) const { return m_type->field_type(); }
+   bool is_unsigned(void) const            { return m_type->is_unsigned(); }
+};
+
+/** */
+template <typename T>
+class FixedParam : public BaseParam
+{
+public:
+   FixedParam(const char *type_name, T &val)
+      : BaseParam(static_cast<const void*>(&val), sizeof(T), get_bdtype(type_name)) { }
+};
+
+class StringParam : public BaseParam
+{
+public:
+   StringParam(const char *val)
+      : BaseParam(static_cast<const void*>(val), 1+strlen(val), &bd_VarString) { }
+};
+
+class VoidParam : public BaseParam
+{
+public:
+   VoidParam(void) : BaseParam(nullptr, 0, nullptr) { }
+};
+
+void summon_binder(IBinder_Callback &cb,...);
 
 #endif
 
