@@ -69,7 +69,10 @@ void execute_query(MYSQL &mysql, IBinder_Callback &cb, const char *query)
  *
  * @return void
  */
-void execute_query_pull(MYSQL &mysql, IPullPack_Callback &cb, const char *query)
+void execute_query_pull(MYSQL &mysql,
+                        IPullPack_Callback &cb,
+                        const char *query,
+                        const Binder *binder)
 {
    MYSQL_STMT *stmt = mysql_stmt_init(&mysql);
    if (stmt)

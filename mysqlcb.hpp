@@ -204,12 +204,34 @@ inline void execute_query(MYSQL &mysql, binder_callback cb, const char *query)
    execute_query(mysql, bu, query);
 }
 
-void execute_query_pull(MYSQL &mysql, IPullPack_Callback &cb, const char *query);
-inline void execute_query_pull(MYSQL &mysql, pullpack_callback cb, const char *query)
+void execute_query_pull(MYSQL &mysql,
+                        IPullPack_Callback &cb,
+                        const char *query,
+                        const Binder *params=nullptr);
+
+inline void execute_query_pull(MYSQL &mysql,
+                               pullpack_callback cb,
+                               const char *query,
+                               const Binder *params=nullptr)
 {
    PullPack_User<pullpack_callback> bu(cb);
-   execute_query_pull(mysql, bu, query);
+   execute_query_pull(mysql, bu, query, params);
 }
+
+inline void execute_query_pull(MYSQL &mysql,
+                               pullpack_callback cb,
+                               const char *query,
+                               BaseParam *param)
+{
+   auto f = [&mysql, &cb, &query](Binder &b)
+   {
+      execute_query_pull(mysql, cb, query, &b);
+   };
+   Binder_User<decltype(f)> bu(f);
+
+   summon_binder(bu, param);
+}
+                               
 
 void t_start_mysql(IConnection_Callback &cb,
                    const char *host=nullptr,
