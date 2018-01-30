@@ -9,12 +9,12 @@ using namespace std;
 
 const BD_Num<int32_t, MYSQL_TYPE_LONG> bd_Int32("INT");
 const BD_Num<uint32_t, MYSQL_TYPE_LONG, 1> bd_UInt32("INT UNSIGNED");
-const BD_Num<int16_t, MYSQL_TYPE_SHORT> bd_Int16("SHORT");
-const BD_Num<uint16_t, MYSQL_TYPE_SHORT, 1> bd_UInt16("SHORT UNSIGNED");
-const BD_Num<int8_t, MYSQL_TYPE_TINY> bd_Int8("TINY");
-const BD_Num<uint8_t, MYSQL_TYPE_TINY, 1> bd_UInt8("TINY UNSIGNED");
-const BD_Num<int64_t, MYSQL_TYPE_LONGLONG> bd_Int64("LONG LONG");
-const BD_Num<uint64_t, MYSQL_TYPE_LONGLONG, 1> bd_UInt64("LONG LONG UNSIGNED");
+const BD_Num<int16_t, MYSQL_TYPE_SHORT> bd_Int16("SMALLINT");
+const BD_Num<uint16_t, MYSQL_TYPE_SHORT, 1> bd_UInt16("SMALLINT UNSIGNED");
+const BD_Num<int8_t, MYSQL_TYPE_TINY> bd_Int8("TINYINT");
+const BD_Num<uint8_t, MYSQL_TYPE_TINY, 1> bd_UInt8("TINYINT UNSIGNED");
+const BD_Num<int64_t, MYSQL_TYPE_LONGLONG> bd_Int64("BIGINT");
+const BD_Num<uint64_t, MYSQL_TYPE_LONGLONG, 1> bd_UInt64("BIGINT UNSIGNED");
 
 const BD_Num<double, MYSQL_TYPE_DOUBLE> bd_Double("DOUBLE");
 const BD_Num<float, MYSQL_TYPE_FLOAT> bd_Float("FLOAT");
@@ -47,6 +47,19 @@ const BDType *get_bdtype(const MYSQL_FIELD &fld)
    while(*ptr)
    {
       if ((*ptr)->field_type()==ftype)
+         return *ptr;
+      ++ptr;
+   };
+   
+   return nullptr;
+}
+
+const BDType *get_bdtype(const char *name)
+{
+   const BDType **ptr = typerefs;
+   while(*ptr)
+   {
+      if ((*ptr)->name_match(name))
          return *ptr;
       ++ptr;
    };
