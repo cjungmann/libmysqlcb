@@ -68,6 +68,7 @@ public:
    virtual const char *type_name(void) const = 0;
 
    virtual bool is_unsigned(void) const = 0;
+   bool name_match(const char *name) const { return 0==strcasecmp(name,type_name()); }
 };
 
 template <enum_field_types ftype, bool is_unsign=0>
