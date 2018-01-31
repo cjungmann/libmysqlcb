@@ -40,7 +40,7 @@ SELECT TABLE_SCHEMA,
        TABLE_NAME,
        DATA_TYPE,
        COLUMN_NAME
-  FROM COLUMNS
+  FROM information_schema.COLUMNS
  WHERE DATA_TYPE='enum'
 ~~~
 
@@ -53,11 +53,12 @@ SELECT TABLE_SCHEMA,
        TABLE_NAME,
        DATA_TYPE,
        COLUMN_NAME
-  FROM COLUMNS
+  FROM information_schema.COLUMNS
  WHERE DATA_TYPE='set'
 ~~~
 
+This statement should show a small number of *set* examples:
 `SELECT sql_mode FROM mysql.event;`
- should show a small number of records, if any events have been created.
 
-`SELECT sql_mode FROM mysql.proc;` will show a larger sample.
+This statement will show a larger number of *set* examples:
+`SELECT sql_mode FROM mysql.proc;`
