@@ -55,7 +55,7 @@ library.  Initially, these tests will consist of handling different data types
 and truncation issues.  In time, it should also include tests for the
 proper execution of the library.
 
-See [mysqlcb Testing](testing.md)
+See [mysqlcb Testing](TESTING.md)
 
 ## Goals
 
