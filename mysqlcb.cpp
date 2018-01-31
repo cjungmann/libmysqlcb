@@ -78,41 +78,53 @@ void execute_query_pull(MYSQL &mysql,
    if (stmt)
    {
       int result = mysql_stmt_prepare(stmt, query, strlen(query));
+
       if (result==0)
       {
-         result = mysql_stmt_execute(stmt);
-         if (result==0)
+         if (binder)
+            result = mysql_stmt_bind_param(stmt, binder->binds);
+
+         if (result)
          {
-            auto f = [&mysql, &cb, &stmt](Binder &binder)
-            {
-               mysql_stmt_bind_result(stmt, binder.binds);
-
-               int persist = 1;
-
-               auto puller = [&stmt, &binder, &persist](int go_on) -> int
-               {
-                  int result;
-                  do
-                  {
-                     result = mysql_stmt_fetch(stmt);
-                     binder.bind_data->is_truncated = result==MYSQL_DATA_TRUNCATED;
-                     persist = result!=MYSQL_NO_DATA;
-                  }
-                  while(go_on && persist);
-
-                  return persist;
-               };
-               Puller_User<decltype(puller)> pu(puller);
-               PullPack pp = {mysql, binder, pu};
-
-               cb(pp);
-            };
-            Binder_User<decltype(f)> bu(f);
-            
-            get_result_binds(mysql, bu, stmt);
+            std::cerr << "Failed to bind parameters \"" << mysql_stmt_error(stmt) << "\"" << std::endl;
          }
          else
-            std::cerr << "Failed to execute statement \"" << mysql_stmt_error(stmt) << "\"" << std::endl;
+         {
+            result = mysql_stmt_execute(stmt);
+            if (result==0)
+            {
+               auto f = [&mysql, &cb, &stmt](Binder &binder)
+                  {
+                     mysql_stmt_bind_result(stmt, binder.binds);
+
+                     int persist = 1;
+
+                     auto puller = [&stmt, &binder, &persist](int go_on) -> int
+                     {
+                        int result;
+                        do
+                        {
+                           result = mysql_stmt_fetch(stmt);
+                           binder.bind_data->is_truncated = result==MYSQL_DATA_TRUNCATED;
+                           persist = result!=MYSQL_NO_DATA;
+                        }
+                        while(go_on && persist);
+
+                        return persist;
+                     };
+                     Puller_User<decltype(puller)> pu(puller);
+                     PullPack pp = {mysql, binder, pu};
+
+                     cb(pp);
+                  };
+               Binder_User<decltype(f)> bu(f);
+            
+               get_result_binds(mysql, bu, stmt);
+            }
+            else
+               std::cerr << "Failed to execute statement \"" << mysql_stmt_error(stmt) << "\"" << std::endl;
+         }
+
       }
       else
       {
