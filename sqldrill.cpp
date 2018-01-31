@@ -3,41 +3,64 @@
 
 #include "mysqlcb.hpp"
 
-#define CLI "\033["
+const char CLI[] = "\033[";
+
+
+const char q_dbases[] = "SELECT SCHEMA_NAME FROM SCHEMATA";
+const char q_tables[] = "SELECT TABLE_NAME FROM TABLES WHERE TABLE_SCHEMA=?";
+const char q_columns[] =
+   "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE"
+   "  FROM COLUMNS"
+   " WHERE TABLE_SCHEMA=?"
+   "   AND TABLE_NAME=?";
 
 void clear_screen(void) { std::cout << CLI << "2J" << CLI << "H"; }
 
-const char q_dbases[] = "SELECT SCHEMA_NAME FROM SCHEMATA";
-const char q_tables[] = "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE"
-                                                             "  FROM COLUMNS"
-                                                             " WHERE TABLE_SCHEMA=?";
-
 struct Llist
 {
-   const char   *line;
-   unsigned int position;
-   Llist        *next;
+   const char *line;
+   uint32_t   position;
+   Llist      *next;
 };
 
-using Llist_Callback = IQuery_Callback<Llist>;
+using ILlist_Callback = IGeneric_Callback<Llist>;
 template <typename Func>
-using Llist_User = Query_User<Llist, Func>;
+using Llist_User = Generic_User<Llist, Func>;
 
-void display_list(const Llist *ll, int selection)
+const char *get_selected_line(const Llist &ll, uint32_t selection)
 {
-   clear_screen();
-   const Llist *ptr = ll;
-   int newposition;
-   while(ptr)
+   const Llist *ptr = &ll;
+   while (ptr)
    {
-      std::cout << ptr->position << " " << ptr->line << std::endl;
+      if (ptr->position==selection)
+         return ptr->line;
       ptr = ptr->next;
    }
-   std::cout << "\nEnter a number to select a line: ";
-   std::cin >> newposition;
+   return nullptr;
 }
 
-void query_list(PullPack &pp)
+void show_columns(const PullPack &pp)
+{
+   clear_screen();
+
+   std::cout << "In show columns!\n\n";
+
+   // We'll just hold on to the first bind_data.
+   Bind_Data *bd = pp.binder.bind_data;
+
+   while (pp.puller(false))
+   {
+      Bind_Data *col = bd;
+      while(valid(col))
+      {
+         std::cout << col << " ";
+         ++col;
+      }
+      std::cout << std::endl;
+   }
+}
+
+void summon_list(ILlist_Callback &cb, const PullPack &pp)
 {
    Llist *head = nullptr;
    Llist *tail = nullptr;
@@ -73,19 +96,110 @@ void query_list(PullPack &pp)
       }
    }
 
-   display_list(head,1);
+   cb(*head);
+
 }
 
-void use_mysql(MYSQL &mysql, const char *dbname)
+/**
+ * This function simply displays each line prefixed with its position value.
+ */
+void display_list(const Llist &ll, int selection)
 {
-   if (dbname)
+   clear_screen();
+   const Llist *ptr = &ll;
+   while(ptr)
    {
-      std::cout << "This ain't done yet.\n";
+      std::cout << ptr->position << " " << ptr->line << std::endl;
+      ptr = ptr->next;
    }
+   std::cout << "\nEnter a number (0 to return) to select a line: ";
+}
+
+/**
+ * This function displays a list, gets a response, and returns the selected string.
+ */
+const char *select_from_list(const Llist &ll)
+{
+   display_list(ll, 1);
+
+   uint32_t selection;
+   std::cin >> selection;
+   if (selection)
+      return get_selected_line(ll, selection);
    else
+      return nullptr;
+}
+
+/** */
+void show_rows(MYSQL &mysql, const char *dbname, const char *tablename)
+{
+   auto f_pullpack = [](const PullPack &pp)
    {
-      execute_query_pull(mysql, query_list, q_dbases);
-   }
+      show_columns(pp);
+      std::cout << "Press any key to return\n";
+      int ival;
+      std::cin >> ival;
+      
+   };
+   PullPack_User<decltype(f_pullpack)> cb_pullpack(f_pullpack);
+
+   auto f_binder = [&mysql, &cb_pullpack](const Binder &binder)
+   {
+      execute_query_pull(mysql, cb_pullpack, q_columns, &binder);
+   };
+   Binder_User<decltype(f_binder)> cb_binder(f_binder);
+
+   summon_binder(cb_binder,
+                 StringParam(dbname),
+                 StringParam(tablename),
+                 VoidParam());
+}
+
+/** */
+void show_tables(MYSQL &mysql, const char *dbname)
+{
+   auto f_llist = [&mysql, &dbname](const Llist &ll)
+   {
+      const char *rline;
+      while((rline=select_from_list(ll)))
+         show_rows(mysql, dbname, rline);
+   };
+   Llist_User<decltype(f_llist)> cb_llist(f_llist);
+
+   auto f_pullpack = [&mysql, &cb_llist](const PullPack &pp)
+   {
+      summon_list(cb_llist, pp);
+   };
+   PullPack_User<decltype(f_pullpack)> cb_pullpack(f_pullpack);
+
+   auto f_binder = [&mysql, &cb_pullpack](const Binder &binder)
+   {
+      execute_query_pull(mysql, cb_pullpack, q_tables, &binder);
+   };
+   Binder_User<decltype(f_binder)> cb_binder(f_binder);
+
+   summon_binder(cb_binder,
+                 StringParam(dbname),
+                 VoidParam());
+}
+
+/** */
+void show_dbases(MYSQL &mysql)
+{
+   auto f_llist = [&mysql](const Llist &ll)
+   {
+      const char *rline;
+      while((rline=select_from_list(ll)))
+         show_tables(mysql, rline);
+   };
+   Llist_User<decltype(f_llist)> cb_llist(f_llist);
+
+   auto f_pullpack = [&mysql, &cb_llist](const PullPack &pp)
+   {
+      summon_list(cb_llist, pp);
+   };
+   PullPack_User<decltype(f_pullpack)> cb_pullpack(f_pullpack);
+   execute_query_pull(mysql, cb_pullpack, q_dbases);
 }
 
 void open_mysql(const char *host,
@@ -111,7 +225,11 @@ void open_mysql(const char *host,
 
       if (handle)
       {
-         use_mysql(mysql, dbase);
+         if (dbase)
+            show_tables(mysql, dbase);
+         else
+            show_dbases(mysql);
+
          mysql_close(&mysql);
       }
       else
