@@ -58,7 +58,9 @@ SELECT TABLE_SCHEMA,
 ~~~
 
 This statement should show a small number of *set* examples:
+
 `SELECT sql_mode FROM mysql.event;`
 
 This statement will show a larger number of *set* examples:
+
 `SELECT sql_mode FROM mysql.proc;`
