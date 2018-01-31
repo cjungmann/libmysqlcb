@@ -2,6 +2,61 @@
 
 A library that simplifies access to MySQL data.
 
+As a learning project, it is limited in its scope.  It includes only three functions,
+- exceute_query
+- execute_query_pull
+- start_mysql
+
+All of the functions perform their task and invoke a callback function in the argument list.
+The callback functions are expected, but not required to be lambda functions, and much of the
+include file, `mysqlcb.hpp`, is actually templates for wrapping lambda functions to allow them
+to be recognized as types for parameter matching.
+
+### execute_query
+
+~~~c++
+void execute_query(MYSQL &mysql,
+                   IBinder_Callback &cb,
+                   const char *query);
+~~~
+
+This function executes the query, then invokes the callback function for each row fetched from
+the query result.  In other words, the results are **pushed** back by the library.
+
+### execute_query_pull
+
+~~~c++
+void execute_query_pull(MYSQL &mysql,
+                        IPullPack_Callback &cb,
+                        const char *query)
+~~~
+
+This function also executes the query, but sends a structure to the callback function that
+includes a struct in which the retrieves records are found, and a **pull** function with
+which the callback function can request result rows, one at a time.
+
+
+### start_mysql
+
+~~~c++
+void start_mysql(IConnection_Callback &cb,
+                 const char *host,
+                 const char *user,
+                 const char *pass,
+                 const char *dbase)
+~~~
+
+This library function makes a basic connection and begins the process.  
+
+## Testing
+
+I am developing a document that will document tests used to develop the
+library.  Initially, these tests will consist of handling different data types
+and truncation issues.  In time, it should also include tests for the
+proper execution of the library.
+
+See [mysqlcb Testing](testing.md)
+
 ## Goals
 
 The project has several goals:
@@ -56,3 +111,13 @@ such as a FastCGI program that may run for hours at a time, processing thousands
 This project is a refinement of the techniques I used to develop the MySQL part of the
 Schema Framework.  It reflects some of what I've learned there, making this MySQL library
 (hopefully) easier to use and understand.
+
+## Sample Programs
+
+Rather than attempt to document the library here, there are several programs included in this
+project that demonstrate certain techniques.
+
+### XMLIFY
+
+This utility will output the results of a query as XML.
+
