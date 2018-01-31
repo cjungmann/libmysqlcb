@@ -211,11 +211,13 @@ void summon_binder(IBinder_Callback &cb, ...)
    }
    va_end(counter);
 
-   MYSQL_BIND *binds = static_cast<MYSQL_BIND*>(alloca(count * sizeof(MYSQL_BIND)));
-   memset(static_cast<void*>(binds), 0, count*sizeof(MYSQL_BIND));
+   size_t memlen = count * sizeof(MYSQL_BIND);
+   MYSQL_BIND *binds = static_cast<MYSQL_BIND*>(alloca(memlen));
+   memset(static_cast<void*>(binds), 0, memlen);
 
-   Bind_Data *bind_data = static_cast<Bind_Data*>(alloca(count+1 * sizeof(Bind_Data)));
-   memset(static_cast<void*>(bind_data), 0, count+1 * sizeof(Bind_Data));
+   memlen = (count+1) * sizeof(Bind_Data);
+   Bind_Data *bind_data = static_cast<Bind_Data*>(alloca(memlen));
+   memset(static_cast<void*>(bind_data), 0, memlen);
 
    Binder binder = { static_cast<uint32_t>(count), nullptr, binds, bind_data };
    
@@ -240,6 +242,9 @@ void summon_binder(IBinder_Callback &cb, ...)
          memcpy(data, param.data(), buffer_length);
          p_bind->buffer = p_data->data = data;
          p_bind->buffer_length = buffer_length;
+
+         ++p_bind;
+         ++p_data;
       }
    }
    va_end(args);
