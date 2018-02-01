@@ -5,6 +5,7 @@
 #include <stdint.h>  // for uint32_t
 #include <string.h>  // for memcpy()
 #include <iostream>
+#include <iomanip>   // setw, setfill, etc.
 
 /**
  * @brief Simple interface for callback.
@@ -206,6 +207,73 @@ public:
       memcpy(buff, bd.data, sizeof(T));
    }
 };
+
+template <enum_field_types ftype>
+class BD_DateBase : public BDBase<ftype>
+{
+public:
+   BD_DateBase(const char *tname) : BDBase<ftype>(tname) { }
+   inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const=0;
+   inline virtual size_t get_size(const Bind_Data &bd) const {return sizeof(MYSQL_TIME);}
+   inline virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const
+   {
+      memcpy(buff, bd.data, sizeof(MYSQL_TIME));
+   }
+};
+
+class BD_Date : public BD_DateBase<MYSQL_TYPE_DATE>
+{
+public:
+   BD_Date(void) : BD_DateBase<MYSQL_TYPE_DATE>("DATE") { }
+   inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const
+   {
+      const MYSQL_TIME &date = *static_cast<const MYSQL_TIME*>(bd.data);
+      os << std::setfill('0')
+         << std::setw(4) << date.year
+         << "-" << std::setw(2) << date.month
+         << "-" << std::setw(2) << date.day;
+      return os;
+   }
+};
+
+template <enum_field_types ftype>
+class BD_DateTimeBase : public BD_DateBase<ftype>
+{
+public:
+   BD_DateTimeBase(const char *name) : BD_DateBase<ftype>(name) { }
+   inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const
+   {
+      const MYSQL_TIME &date = *static_cast<const MYSQL_TIME*>(bd.data);
+      os << std::setfill('0')
+         << std::setw(4) << date.year
+         << "-" << std::setw(2) << date.month
+         << "-" << std::setw(2) << date.day
+         << " " << std::setw(2) << date.hour
+         << ":" << std::setw(2) << date.minute
+         << ":" << std::setw(2) << date.second;
+      return os;
+   }
+};
+
+using BD_DateTime = BD_DateTimeBase<MYSQL_TYPE_DATETIME>;
+using BD_TimeStamp = BD_DateTimeBase<MYSQL_TYPE_TIMESTAMP>;
+
+class BD_Time : public BD_DateBase<MYSQL_TYPE_TIME>
+{
+public:
+   BD_Time(void) : BD_DateBase<MYSQL_TYPE_TIME>("TIME") { }
+   inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const
+   {
+      const MYSQL_TIME &date = *static_cast<const MYSQL_TIME*>(bd.data);
+      os << std::setfill('0')
+         << std::setw(2) << date.hour
+         << ":" << std::setw(2) << date.minute
+         << ":" << std::setw(2) << date.second;
+      return os;
+   }
+};
+
+
 
 
 template <enum_field_types strtype>
