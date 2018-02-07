@@ -5,6 +5,7 @@
 #include <stdint.h>  // for uint32_t
 #include "mysqlcb_binder.hpp"
 
+
 /** *************** */
 class IPuller_Callback
 {
@@ -31,11 +32,20 @@ struct PullPack
    MYSQL            &mysql;
    Binder           &binder;
    IPuller_Callback &puller;
+
+   operator MYSQL&() const { return mysql; }
+
+   void validate(void)
+   {
+      if (&mysql==nullptr)
+         std::cout << "Invalid PullPack!\n";
+   }
 };
 
 using IPullPack_Callback = IGeneric_Callback<PullPack>;
 template <typename Func>
 using PullPack_User = Generic_User<PullPack,Func>;
+
 
 
 /**
@@ -95,45 +105,6 @@ inline void start_pull(const Querier_Pack &qp, Func f, const char *query)
    PullPack_User<Func> pu(f);
    qp.pullcb(pu, query);
 }
-
-/** **************** */
-class IQuerier_Callback
-{
-public:
-   virtual ~IQuerier_Callback() {}
-   virtual void operator()(const Querier_Pack &qp) const = 0;
-};
-
-template <typename Func>
-class Querier_User : public IQuerier_Callback
-{
-protected:
-   const Func &m_f;
-public:
-   Querier_User(const Func &f) : m_f(f)            {}
-   virtual ~Querier_User()                         {}
-   virtual void operator()(const Querier_Pack &qp) { m_f(qp); }
-};
-
-
-class IConnection_Callback
-{
-public:
-   virtual ~IConnection_Callback() {}
-   virtual void operator()(Querier_Pack &qp) const = 0;
-};
-
-template <typename Func>
-class Connection_User : public IConnection_Callback
-{
-protected:
-   const Func &m_f;
-public:
-   Connection_User(const Func &f) : m_f(f)              {}
-   virtual ~Connection_User()                           {}
-   virtual void operator()(Querier_Pack &cb) const { m_f(cb); }
-};
-
 
 
 /**
@@ -231,9 +202,41 @@ inline void execute_query_pull(MYSQL &mysql,
 
    summon_binder(bu, param);
 }
+
+inline void execute_query_pull(MYSQL &mysql,
+                               IPullPack_Callback &cb,
+                               const char *query,
+                               const MParam *params)
+{
+   auto f = [&mysql, &cb, &query](Binder &b)
+   {
+      execute_query_pull(mysql, cb, query, &b);
+   };
+   Binder_User<decltype(f)> bu(f);
+
+   summon_binder(bu, params);
+}
+                               
+inline void execute_query_pull(MYSQL &mysql,
+                               pullpack_callback cb,
+                               const char *query,
+                               const MParam *params)
+{
+   auto f = [&mysql, &cb, &query](Binder &b)
+   {
+      execute_query_pull(mysql, cb, query, &b);
+   };
+   Binder_User<decltype(f)> bu(f);
+
+   summon_binder(bu, params);
+}
                                
 
-void t_start_mysql(IConnection_Callback &cb,
+using IMySQL_Callback = IGeneric_Callback<MYSQL>;
+template <typename Func>
+using MySQL_User = Generic_User<MYSQL, Func>;
+
+void t_start_mysql(IMySQL_Callback &cb,
                    const char *host=nullptr,
                    const char *user=nullptr,
                    const char *pass=nullptr,
@@ -246,9 +249,46 @@ void start_mysql(Func &cb,
                  const char *pass=nullptr,
                  const char *dbase=nullptr)
 {
-   Connection_User<Func> cu(cb);
+   MySQL_User<Func> cu(cb);
    t_start_mysql(cu,host,user,pass,dbase);
 }
+
+/** **************** */
+class IQuerier_Callback
+{
+public:
+   virtual ~IQuerier_Callback() {}
+   virtual void operator()(Querier_Pack &qp) const = 0;
+};
+
+template <typename Func>
+class Querier_User : public IQuerier_Callback
+{
+protected:
+   const Func &m_f;
+public:
+   Querier_User(const Func &f) : m_f(f)            {}
+   virtual ~Querier_User()                         {}
+   virtual void operator()(Querier_Pack &qp) const { m_f(qp); }
+};
+
+void t_get_querier_pack(IQuerier_Callback &cb,
+                        const char *host = nullptr,
+                        const char *user = nullptr,
+                        const char *pass = nullptr,
+                        const char *dbase = nullptr);
+
+template <typename Func>
+void get_querier_pack(Func &cb,
+                      const char *host = nullptr,
+                      const char *user = nullptr,
+                      const char *pass = nullptr,
+                      const char *dbase = nullptr)
+{
+   Querier_User<Func> qu(cb);
+   t_get_querier_pack(qu,host,user,pass,dbase);
+}
+
 
 
 
