@@ -31,6 +31,19 @@ const BD_String<MYSQL_TYPE_BLOB>               bd_Blob("BLOB");
 const BD_String<MYSQL_TYPE_ENUM>               bd_Enum("ENUM");
 const BD_String<MYSQL_TYPE_SET>                bd_Set("SET");
 
+MParam::MParam(const char *str)
+   : m_size(strlen(str)+1), m_data(str), m_type(&bd_VarString) { }
+
+MParam::MParam(int &val)
+   : m_size(sizeof(int)), m_data(&val), m_type(&bd_Int32) { }
+
+MParam::MParam(unsigned int &val)
+   : m_size(sizeof(unsigned int)), m_data(&val), m_type(&bd_UInt32) { }
+
+MParam::MParam(double &val)
+   : m_size(sizeof(double)), m_data(&val), m_type(&bd_Double) { }
+
+
 
 const BDType *typerefs[] = {
    &bd_Int32,
@@ -81,6 +94,18 @@ const BDType *get_bdtype(const char *name)
    };
    
    return nullptr;
+}
+
+bool confirm_bdtype(const BDType *t)
+{
+   const BDType **ptr = typerefs;
+   while(*ptr)
+   {
+      if (*ptr == t)
+         return true;
+      ++ptr;
+   };
+   return false;
 }
 
 
@@ -136,6 +161,16 @@ void set_bind_values(MYSQL_BIND &b, const BaseParam &param)
    b.buffer_type = param.field_type();
    b.is_unsigned = param.is_unsigned();
    *(b.length) = param.get_size();
+}
+
+void set_bind_values(MYSQL_BIND &b, const MParam *param)
+{
+   // set_bind_pointers_to_data_members() must be called first.
+   assert(b.length);
+
+   b.buffer_type = param->field_type();
+   b.is_unsigned = param->is_unsigned();
+   *(b.length) = param->size();
 }
 
 void set_bind_data_object_pointers(Bind_Data &bd, MYSQL_FIELD &field, MYSQL_BIND &bind)
@@ -204,7 +239,7 @@ void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt)
       }
       else
       {
-         cerr << "Error getting result metadata." << endl;
+         throw std::runtime_error("Error getting result metadata.");
       }
    }
 }
@@ -264,6 +299,57 @@ void summon_binder(IBinder_Callback &cb, ...)
       }
    }
    va_end(args);
+
+   cb(binder);
+}
+
+
+void summon_binder(IBinder_Callback &cb, const MParam *params)
+{
+   const MParam *ptr = nullptr;
+
+   // Count params ahead of allocating pointer arrays:
+   uint32_t count = 0;
+   ptr = params;
+   while (ptr++->is_valid())
+      ++count;
+
+   // Allocate arrays memory and install into a binder object:
+   size_t memlen = count * sizeof(MYSQL_BIND);
+   MYSQL_BIND *binds = static_cast<MYSQL_BIND*>(alloca(memlen));
+   memset(static_cast<void*>(binds), 0, memlen);
+
+   memlen = (count+1) * sizeof(Bind_Data);
+   Bind_Data *bind_data = static_cast<Bind_Data*>(alloca(memlen));
+   memset(static_cast<void*>(bind_data), 0, memlen);
+
+   Binder binder = {count, nullptr, binds, bind_data };
+   
+   MYSQL_BIND *p_bind = binds;
+   Bind_Data *p_data = bind_data;
+
+
+   ptr = params;
+   while (ptr->is_valid())
+   {
+      set_bind_pointers_to_data_members(*p_bind, *p_data);
+      set_bind_values(*p_bind, ptr);
+      p_data->bind = p_bind;
+
+      // uint32_t buffer_length = get_buffer_size(fields[i]);
+      uint32_t buffer_length = ptr->size();
+
+      // alloca must be in this scope to persist until callback:
+      void *data = alloca(buffer_length);
+      memcpy(data, ptr->data(), buffer_length);
+      p_bind->buffer = p_data->data = data;
+      p_bind->buffer_length = buffer_length;
+
+      ++p_bind;
+      ++p_data;
+
+      ++ptr;
+   }
 
    cb(binder);
 }
