@@ -7,6 +7,88 @@
 #include "mysqlcb_binder.hpp"
 #include "mysqlcb.hpp"
 
+class IString_Callback
+{
+public:
+   virtual ~IString_Callback() { }
+   virtual void operator()(const char *) const = 0;
+};
+
+template <class Func>
+class String_User : public IString_Callback
+{
+protected:
+   Func &m_f;
+public:
+   String_User(Func &f) : m_f(f) { }
+   virtual void operator()(const char *v) const { m_f(v); }
+};
+
+const char *nullstr = static_cast<const char*>(nullptr);
+
+void get_stack_string_args(IString_Callback &cb, va_list args)
+{
+   va_list counter;
+   va_copy(counter, args);
+
+   size_t buff_len = 1;
+
+   while (1)
+   {
+      const char *str = va_arg(counter, const char*);
+      if (str)
+         buff_len += strlen(str);
+      else
+         break;
+   }
+   va_end(counter);
+
+   char *buffer = static_cast<char*>(alloca(buff_len));
+   char *ptr = buffer;
+   size_t substr_len;
+   while (1)
+   {
+      const char *str = va_arg(args, const char*);
+      if (str)
+      {
+         substr_len = strlen(str);
+         memcpy(ptr, str, substr_len);
+         ptr += substr_len;
+      }
+      else
+      {
+         *ptr = '\0';
+         break;
+      }
+   }
+
+   cb(buffer);
+}
+
+void get_stack_string(IString_Callback &cb, ...)
+{
+   va_list args;
+   va_start(args, cb);
+   get_stack_string_args(cb, args);
+   va_end(args);
+}
+
+void get_stack_string(void(*f)(const char*), ...)
+{
+   String_User<decltype(f)> su(f);
+   va_list args;
+   va_start(args, f);
+   get_stack_string_args(su, args);
+   va_end(args);
+}
+
+
+
+void throw_error(const char *err)
+{
+   throw std::runtime_error(err);
+}
+
 /**
  * Executes the query, then calls the callback function with each result row.
  *
@@ -45,17 +127,29 @@ void execute_query(MYSQL &mysql, IBinder_Callback &cb, const char *query)
             get_result_binds(mysql, bu, stmt);
          }
          else
-            std::cerr << "Failed to execute statement \"" << mysql_stmt_error(stmt) << "\"" << std::endl;
+            get_stack_string(throw_error,
+                             "Failed to execute statement \"",
+                             mysql_stmt_error(stmt),
+                             "\"\n",
+                             nullstr);
       }
       else
       {
-         std::cerr << "Failed to prepare statement \"" << mysql_error(&mysql) << "\"" << std::endl;
+         get_stack_string(throw_error,
+                          "Failed to prepare statement \"",
+                          mysql_stmt_error(stmt),
+                          "\"\n",
+                          nullstr);
       }
 
       mysql_stmt_close(stmt);
    }
    else
-      std::cerr << "Failed to initialize the statement." << std::endl;
+      get_stack_string(throw_error,
+                       "Failed to initialize statement \"",
+                       mysql_stmt_error(stmt),
+                       "\"\n",
+                       nullstr);
 }
 
 /**
@@ -86,7 +180,11 @@ void execute_query_pull(MYSQL &mysql,
 
          if (result)
          {
-            std::cerr << "Failed to bind parameters \"" << mysql_stmt_error(stmt) << "\"" << std::endl;
+            get_stack_string(throw_error,
+                             "Failed to bind parameters \"",
+                             mysql_stmt_error(stmt),
+                             "\"\n",
+                             nullstr);
          }
          else
          {
@@ -122,30 +220,40 @@ void execute_query_pull(MYSQL &mysql,
                get_result_binds(mysql, bu, stmt);
             }
             else
-               std::cerr << "Failed to execute statement \"" << mysql_stmt_error(stmt) << "\"" << std::endl;
+               get_stack_string(throw_error,
+                                "Failed to execute statement \"",
+                                mysql_stmt_error(stmt),
+                                "\"\n",
+                                nullstr);
          }
 
       }
       else
       {
-         std::cerr << "Failed to prepare statement \"" << mysql_error(&mysql) << "\"" << std::endl;
+         get_stack_string(throw_error,
+                          "Failed to prepare statement \"",
+                          mysql_stmt_error(stmt),
+                          "\"\n",
+                          nullstr);
       }
 
       mysql_stmt_close(stmt);
    }
    else
-      std::cerr << "Failed to initialize the statement." << std::endl;
+      get_stack_string(throw_error,
+                       "Failed to initialize statement \"",
+                       mysql_stmt_error(stmt),
+                       "\"\n",
+                       nullstr);
 }
 
-void t_start_mysql(IConnection_Callback &cb,
+void t_start_mysql(IMySQL_Callback &cb,
                    const char *host,
                    const char *user,
                    const char *pass,
                    const char *dbase)
 {
    MYSQL mysql;
-   bool  in_query = false;
-   static const char msg_osync[] = "Old query must run to completion before start a new query.\n";
 
    // remainder of mysql_real_connect arguments:
    int           port = 0;
@@ -163,52 +271,73 @@ void t_start_mysql(IConnection_Callback &cb,
 
       if (handle)
       {
-
-         auto fpusher = [&mysql, &in_query](IBinder_Callback &cb, const char *query) -> void
-            {
-               if (in_query)
-               {
-                  std::cerr << msg_osync;
-               }
-               else
-               {
-                  in_query = true;
-                  execute_query(mysql, cb, query);
-                  in_query = false;
-               }
-            };
-         PushQuery_User<decltype(fpusher)> pushercb(fpusher);
-
-         auto fpuller = [&mysql, &in_query](IPullPack_Callback &cb, const char *query) -> void
-            {
-               if (in_query)
-               {
-                  std::cerr << msg_osync;
-               }
-               else
-               {
-                  in_query = true;
-                  execute_query_pull(mysql, cb, query);
-                  in_query = false;
-               }
-            };
-         PullQuery_User<decltype(fpuller)> pullercb(fpuller);
-
-
-         Querier_Pack qp = {pushercb, pullercb};
-
-         cb(qp);
-
-         // use_mysql(mysql);
+         cb(mysql);
          mysql_close(&mysql);
       }
       else
       {
-         std::cerr << "MySQL connection failed: " << mysql_error(&mysql) << std::endl;
+         get_stack_string(throw_error,
+                          "MySQL connection failed \"",
+                          mysql_error(&mysql),
+                          "\"\n",
+                          nullstr);
       }
    }
    else
-      std::cerr << "Failed to initialize MySQL: insufficient memory?\n";
-   
+      get_stack_string(throw_error,
+                       "Failed to initialize MySQL: insufficient memory?\n",
+                       nullstr);
+}
+
+void run_querier_pack(IQuerier_Callback &cb, MYSQL &mysql)
+{
+   bool  in_query = false;
+   static const char msg_osync[] = "Old query must run to completion before start a new query.\n";
+
+   auto fpusher = [&mysql, &in_query](IBinder_Callback &cb, const char *query) -> void
+      {
+         if (in_query)
+         {
+            std::cerr << msg_osync;
+         }
+         else
+         {
+            in_query = true;
+            execute_query(mysql, cb, query);
+            in_query = false;
+         }
+      };
+   PushQuery_User<decltype(fpusher)> pushercb(fpusher);
+
+   auto fpuller = [&mysql, &in_query](IPullPack_Callback &cb, const char *query) -> void
+      {
+         if (in_query)
+         {
+            std::cerr << msg_osync;
+         }
+         else
+         {
+            in_query = true;
+            execute_query_pull(mysql, cb, query);
+            in_query = false;
+         }
+      };
+   PullQuery_User<decltype(fpuller)> pullercb(fpuller);
+
+   Querier_Pack qp = {pushercb, pullercb};
+
+   cb(qp);
+}
+
+void t_get_querier_pack(IQuerier_Callback &cb,
+                        const char *host, const char *user, const char *pass, const char *dbase)
+{
+   auto f = [&cb](MYSQL &mysql)
+   {
+      run_querier_pack(cb, mysql);
+   };
+   MySQL_User<decltype(f)> su(f);
+
+   start_mysql(su, host, user, pass, dbase);
 }
 
