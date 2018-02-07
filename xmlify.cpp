@@ -92,7 +92,7 @@ void run_query(const char *query,
       std::cout << "</resultset>\n";
    };
 
-   start_mysql(fqp, host, user, password, dbase);
+   get_querier_pack(fqp, host, user, password, dbase);
 }
 
 void show_usage(void)
@@ -179,7 +179,16 @@ int main(int argc, char **argv)
    if (display_usage)
       show_usage();
    else
-      run_query(query, host, user, password, dbase, include_schema);
+   {
+      try
+      {
+         run_query(query, host, user, password, dbase, include_schema);
+      }
+      catch(std::exception &e)
+      {
+         std::cerr << "Error " << e.what() << std::endl;
+      }
+   }
 
    return 0;
 }
