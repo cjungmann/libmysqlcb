@@ -43,10 +43,11 @@ binder.o : binder.cpp mysqlcb_binder.hpp
 
 install:
 	install -d $(PREFIX)/lib
-	install -m 644 libmysqlcb.so.1.0 $(PREFIX)/lib
+	install -m 644 libmysqlcb.so* $(PREFIX)/lib
 	install -d $(PREFIX)/include
 	install -m 644 mysqlcb_binder.hpp $(PREFIX)/include
 	install -m 644 mysqlcb.hpp $(PREFIX)/include
+	ldconfig $(PREFIX)
 
 uninstall:
 	delete -f $(PREFIX)/lib/libmysqlcb.so
