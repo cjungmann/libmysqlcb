@@ -92,7 +92,7 @@ void start_app(void)
       start_push(qp, xmlify, "SELECT SCHEMA_NAME FROM SCHEMATA");
    };
 
-   start_mysql(fqp);
+   get_querier_pack(fqp);
 }
   
 
