@@ -6,6 +6,7 @@
 #include "mysqlcb.hpp"
 #include "mysqlcb_binder.hpp"
 using namespace std;
+namespace mysqlcb {
 
 const BD_Num<int32_t, MYSQL_TYPE_LONG>         bd_Int32("INT");
 const BD_Num<uint32_t, MYSQL_TYPE_LONG, 1>     bd_UInt32("INT UNSIGNED");
@@ -353,3 +354,5 @@ void summon_binder(IBinder_Callback &cb, const MParam *params)
 
    cb(binder);
 }
+
+}// namespace

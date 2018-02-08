@@ -8,6 +8,8 @@
 #include <iostream>
 #include <iomanip>   // setw, setfill, etc.
 
+
+namespace mysqlcb {
 /**
  * @brief Simple interface for callback.
  * @sa Generic_User
@@ -384,6 +386,6 @@ public:
 
 void summon_binder(IBinder_Callback &cb, const MParam *param);
 
-
+}  // end of namespace mysqlcb
 #endif
 

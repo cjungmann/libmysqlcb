@@ -5,6 +5,8 @@ using namespace std;
 
 #include "mysqlcb.hpp"
 
+using namespace mysqlcb;
+
 
 void use_row(Binder &b)
 {

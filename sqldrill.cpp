@@ -1,7 +1,10 @@
 #include <mysql.h>
 #include <iostream>
+#include <exception>
 
 #include "mysqlcb.hpp"
+
+using namespace mysqlcb;
 
 const char CLI[] = "\033[";
 
@@ -9,7 +12,7 @@ const char CLI[] = "\033[";
 const char q_dbases[] = "SELECT SCHEMA_NAME FROM SCHEMATA";
 const char q_tables[] = "SELECT TABLE_NAME FROM TABLES WHERE TABLE_SCHEMA=?";
 const char q_columns[] =
-   "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE"
+   "SELECT COLUMN_NAME, COLUMN_TYPE"
    "  FROM COLUMNS"
    " WHERE TABLE_SCHEMA=?"
    "   AND TABLE_NAME=?";
@@ -39,11 +42,10 @@ const char *get_selected_line(const Llist &ll, uint32_t selection)
    return nullptr;
 }
 
+
 void show_columns(const PullPack &pp)
 {
    clear_screen();
-
-   std::cout << "In show columns!\n\n";
 
    // We'll just hold on to the first bind_data.
    Bind_Data *bd = pp.binder.bind_data;
@@ -143,16 +145,8 @@ void show_rows(MYSQL &mysql, const char *dbname, const char *tablename)
    };
    PullPack_User<decltype(f_pullpack)> cb_pullpack(f_pullpack);
 
-   auto f_binder = [&mysql, &cb_pullpack](const Binder &binder)
-   {
-      execute_query_pull(mysql, cb_pullpack, q_columns, &binder);
-   };
-   Binder_User<decltype(f_binder)> cb_binder(f_binder);
-
-   summon_binder(cb_binder,
-                 StringParam(dbname),
-                 StringParam(tablename),
-                 VoidParam());
+   MParam params[3] = { dbname, tablename };
+   execute_query_pull(mysql, cb_pullpack, q_columns, params);
 }
 
 /** */
@@ -172,15 +166,8 @@ void show_tables(MYSQL &mysql, const char *dbname)
    };
    PullPack_User<decltype(f_pullpack)> cb_pullpack(f_pullpack);
 
-   auto f_binder = [&mysql, &cb_pullpack](const Binder &binder)
-   {
-      execute_query_pull(mysql, cb_pullpack, q_tables, &binder);
-   };
-   Binder_User<decltype(f_binder)> cb_binder(f_binder);
-
-   summon_binder(cb_binder,
-                 StringParam(dbname),
-                 VoidParam());
+   MParam params[2] = { dbname };
+   execute_query_pull(mysql, cb_pullpack, q_tables, params);
 }
 
 /** */
@@ -225,10 +212,17 @@ void open_mysql(const char *host,
 
       if (handle)
       {
-         if (dbase)
-            show_tables(mysql, dbase);
-         else
-            show_dbases(mysql);
+         try
+         {
+            if (dbase)
+               show_tables(mysql, dbase);
+            else
+               show_dbases(mysql);
+         }
+         catch(std::exception &e)
+         {
+            std::cerr << "Caught exception " << e.what() << std::endl;
+         }
 
          mysql_close(&mysql);
       }

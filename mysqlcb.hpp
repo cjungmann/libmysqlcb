@@ -5,6 +5,7 @@
 #include <stdint.h>  // for uint32_t
 #include "mysqlcb_binder.hpp"
 
+namespace mysqlcb {
 
 /** *************** */
 class IPuller_Callback
@@ -290,7 +291,7 @@ void get_querier_pack(Func &cb,
 }
 
 
-
+}  // end of namespace declaration
 
 #endif
 

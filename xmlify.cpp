@@ -3,6 +3,8 @@
 
 #include "mysqlcb.hpp"
 
+using namespace mysqlcb;
+
 /** Adds attributes to a schema field element for set flags. */
 void add_field_attributes_from_flags(unsigned int flags)
 {

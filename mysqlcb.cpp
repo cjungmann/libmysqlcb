@@ -7,6 +7,8 @@
 #include "mysqlcb_binder.hpp"
 #include "mysqlcb.hpp"
 
+namespace mysqlcb {
+
 class IString_Callback
 {
 public:
@@ -341,3 +343,4 @@ void t_get_querier_pack(IQuerier_Callback &cb,
    start_mysql(su, host, user, pass, dbase);
 }
 
+} // namespace
