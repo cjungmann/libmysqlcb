@@ -19,21 +19,21 @@ ifndef PREFIX
 	PREFIX := /usr/local
 endif
 
-all: libmysqlcb.so.1.0 test xmlify sqldrill
+all: libmysqlcb.so.0.1 test xmlify sqldrill
 
 # Omit linking mysql library to prove that libmysqlcb is sufficient without it.
-test: test.cpp libmysqlcb.so.1.0
+test: test.cpp libmysqlcb.so.0.1
 	$(CXX) $(CXXFLAGS) -L. -o test test.cpp -Wl,-R -Wl,. -lmysqlcb
 
-xmlify: xmlify.cpp libmysqlcb.so.1.0
+xmlify: xmlify.cpp libmysqlcb.so.0.1
 	$(CXX) $(CXXFLAGS) -L. -o xmlify xmlify.cpp -Wl,-R -Wl,. -lmysqlcb
 
-sqldrill: sqldrill.cpp libmysqlcb.so.1.0
+sqldrill: sqldrill.cpp libmysqlcb.so.0.1
 	$(CXX) $(CXXFLAGS) -L. -o sqldrill sqldrill.cpp ${LINK_FLAGS} -Wl,-R -Wl,. -lmysqlcb
 
-libmysqlcb.so.1.0 : mysqlcb.o binder.o
-	$(CXX) -shared -o libmysqlcb.so.1.0 mysqlcb.o binder.o ${LINK_FLAGS}
-	ln -sf libmysqlcb.so.1.0 libmysqlcb.so
+libmysqlcb.so.0.1 : mysqlcb.o binder.o
+	$(CXX) -shared -o libmysqlcb.so.0.1 mysqlcb.o binder.o ${LINK_FLAGS}
+	ln -sf libmysqlcb.so.0.1 libmysqlcb.so
 
 mysqlcb.o : mysqlcb.cpp mysqlcb.hpp mysqlcb_binder.hpp
 	$(CXX) $(CXXFLAGS) -c -o mysqlcb.o mysqlcb.cpp
@@ -50,10 +50,10 @@ install:
 	ldconfig $(PREFIX)
 
 uninstall:
-	delete -f $(PREFIX)/lib/libmysqlcb.so
-	delete -f $(PREFIX)/lib/libmysqlcb.so.1.0
-	delete -f $(PREFIX)/include/mysqlcb.hpp
-	delete -f $(PREFIX)/include/mysqlcb_binder.hpp
+	rm -f $(PREFIX)/lib/libmysqlcb.so
+	rm -f $(PREFIX)/lib/libmysqlcb.so.0.1
+	rm -f $(PREFIX)/include/mysqlcb.hpp
+	rm -f $(PREFIX)/include/mysqlcb_binder.hpp
 
 clean:
 	rm -f *.o libmysqlcb.so* test
