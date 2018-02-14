@@ -2,23 +2,24 @@
 #include <iostream>
 #include <string.h>
 #include <alloca.h>
+#include <math.h>
 #include <assert.h>
 #include "mysqlcb.hpp"
 #include "mysqlcb_binder.hpp"
 using namespace std;
 namespace mysqlcb {
 
-const BD_Num<int32_t, MYSQL_TYPE_LONG>         bd_Int32("INT");
-const BD_Num<uint32_t, MYSQL_TYPE_LONG, 1>     bd_UInt32("INT UNSIGNED");
-const BD_Num<int16_t, MYSQL_TYPE_SHORT>        bd_Int16("SMALLINT");
-const BD_Num<uint16_t, MYSQL_TYPE_SHORT, 1>    bd_UInt16("SMALLINT UNSIGNED");
-const BD_Num<int8_t, MYSQL_TYPE_TINY>          bd_Int8("TINYINT");
-const BD_Num<uint8_t, MYSQL_TYPE_TINY, 1>      bd_UInt8("TINYINT UNSIGNED");
-const BD_Num<int64_t, MYSQL_TYPE_LONGLONG>     bd_Int64("BIGINT");
-const BD_Num<uint64_t, MYSQL_TYPE_LONGLONG, 1> bd_UInt64("BIGINT UNSIGNED");
+const BD_Int<int32_t, MYSQL_TYPE_LONG>         bd_Int32("INT");
+const BD_Int<uint32_t, MYSQL_TYPE_LONG, 1>     bd_UInt32("INT UNSIGNED");
+const BD_Int<int16_t, MYSQL_TYPE_SHORT>        bd_Int16("SMALLINT");
+const BD_Int<uint16_t, MYSQL_TYPE_SHORT, 1>    bd_UInt16("SMALLINT UNSIGNED");
+const BD_Int<int8_t, MYSQL_TYPE_TINY>          bd_Int8("TINYINT");
+const BD_Int<uint8_t, MYSQL_TYPE_TINY, 1>      bd_UInt8("TINYINT UNSIGNED");
+const BD_Int<int64_t, MYSQL_TYPE_LONGLONG>     bd_Int64("BIGINT");
+const BD_Int<uint64_t, MYSQL_TYPE_LONGLONG, 1> bd_UInt64("BIGINT UNSIGNED");
 
-const BD_Num<double, MYSQL_TYPE_DOUBLE>        bd_Double("DOUBLE");
-const BD_Num<float, MYSQL_TYPE_FLOAT>          bd_Float("FLOAT");
+const BD_Float<double, MYSQL_TYPE_DOUBLE>      bd_Double("DOUBLE");
+const BD_Float<float, MYSQL_TYPE_FLOAT>        bd_Float("FLOAT");
 
 const BD_Date                                  bd_Date;
 const BD_Time                                  bd_Time;
@@ -33,7 +34,7 @@ const BD_String<MYSQL_TYPE_ENUM>               bd_Enum("ENUM");
 const BD_String<MYSQL_TYPE_SET>                bd_Set("SET");
 
 MParam::MParam(const char *str)
-   : m_size(strlen(str)+1), m_data(str), m_type(&bd_VarString) { }
+   : m_size(strlen(str)), m_data(str), m_type(&bd_VarString) { }
 
 MParam::MParam(int &val)
    : m_size(sizeof(int)), m_data(&val), m_type(&bd_Int32) { }
