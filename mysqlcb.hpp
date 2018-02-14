@@ -176,62 +176,98 @@ inline void execute_query(MYSQL &mysql, binder_callback cb, const char *query)
    execute_query(mysql, bu, query);
 }
 
-void execute_query_pull(MYSQL &mysql,
-                        IPullPack_Callback &cb,
-                        const char *query,
-                        const Binder *params=nullptr);
-
-inline void execute_query_pull(MYSQL &mysql,
-                               pullpack_callback cb,
-                               const char *query,
-                               const Binder *params=nullptr)
-{
-   PullPack_User<pullpack_callback> bu(cb);
-   execute_query_pull(mysql, bu, query, params);
-}
-
-inline void execute_query_pull(MYSQL &mysql,
-                               pullpack_callback cb,
-                               const char *query,
-                               BaseParam *param)
-{
-   auto f = [&mysql, &cb, &query](Binder &b)
-   {
-      execute_query_pull(mysql, cb, query, &b);
-   };
-   Binder_User<decltype(f)> bu(f);
-
-   summon_binder(bu, param);
-}
-
-inline void execute_query_pull(MYSQL &mysql,
+   /** This is the real function.  All the overrides below massage the
+       arguments to conform to and call this function.
+   */
+   void int_execute_query_pull(MYSQL &mysql,
                                IPullPack_Callback &cb,
                                const char *query,
-                               const MParam *params)
-{
-   auto f = [&mysql, &cb, &query](Binder &b)
-   {
-      execute_query_pull(mysql, cb, query, &b);
-   };
-   Binder_User<decltype(f)> bu(f);
+                               const Binder *params);
 
-   summon_binder(bu, params);
-}
-                               
-inline void execute_query_pull(MYSQL &mysql,
-                               pullpack_callback cb,
-                               const char *query,
-                               const MParam *params)
-{
-   auto f = [&mysql, &cb, &query](Binder &b)
+   // No-param pulls
+   inline void execute_query_pull(MYSQL &mysql,
+                                  IPullPack_Callback &cb,
+                                  const char *query)
    {
-      execute_query_pull(mysql, cb, query, &b);
-   };
-   Binder_User<decltype(f)> bu(f);
+      int_execute_query_pull(mysql,cb,query,nullptr);
+   }
 
-   summon_binder(bu, params);
-}
-                               
+   template <typename Func>
+   inline void execute_query_pull(MYSQL &mysql,
+                                  Func cb,
+                                  const char *query)
+   {
+      PullPack_User<Func> bu(cb);
+      int_execute_query_pull(mysql, bu, query, nullptr);
+   }
+
+   // Binder pointer pulls
+   inline void execute_query_pull(MYSQL &mysql,
+                                  IPullPack_Callback &cb,
+                                  const char *query,
+                                  const Binder *params)
+   {
+      int_execute_query_pull(mysql,cb,query,params);
+   }
+
+   template <typename Func>
+   inline void execute_query_pull(MYSQL &mysql,
+                                  Func cb,
+                                  const char *query,
+                                  const Binder *params)
+   {
+      PullPack_User<Func> bu(cb);
+      int_execute_query_pull(mysql, bu, query, params);
+   }
+
+   // BaseParam pointer pulls
+   // template <typename Func>
+   // inline void execute_query_pull(MYSQL &mysql,
+   //                                Func cb,
+   //                                const char *query,
+   //                                BaseParam *param)
+   // {
+   //    auto f = [&mysql, &cb, &query](Binder &b)
+   //       {
+   //          PullPack_User<Func> bu(cb);
+   //          int_execute_query_pull(mysql, bu, query, &b);
+   //       };
+   //    Binder_User<decltype(f)> bu(f);
+
+   //    summon_binder(bu, param);
+   // }
+
+   // MParam array pointer pulls
+   inline void execute_query_pull(MYSQL &mysql,
+                                  IPullPack_Callback &cb,
+                                  const char *query,
+                                  const MParam *params)
+   {
+      auto f = [&mysql, &cb, &query](Binder &b)
+         {
+            int_execute_query_pull(mysql, cb, query, &b);
+         };
+      Binder_User<decltype(f)> bu(f);
+
+      summon_binder(bu, params);
+   }
+
+   template <typename Func>
+   inline void execute_query_pull(MYSQL &mysql,
+                                  Func cb,
+                                  const char *query,
+                                  const MParam *params)
+   {
+      auto f = [&mysql, &cb, &query](Binder &b)
+      {
+         PullPack_User<Func> bu(cb);
+         int_execute_query_pull(mysql, bu, query, &b);
+      };
+      Binder_User<decltype(f)> bu(f);
+
+      summon_binder(bu, params);
+   }
+      
 
 using IMySQL_Callback = IGeneric_Callback<MYSQL>;
 template <typename Func>
