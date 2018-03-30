@@ -45,6 +45,25 @@ namespace mysqlcb {
       virtual void operator()(T &t) const  { m_f(t); }
    };
 
+
+   class IString_Callback
+   {
+   public:
+      virtual ~IString_Callback() { }
+      virtual void operator()(const char *) const = 0;
+   };
+
+   template <class Func>
+   class String_User : public IString_Callback
+   {
+   protected:
+      Func &m_f;
+   public:
+      String_User(Func &f) : m_f(f) { }
+      virtual void operator()(const char *v) const { m_f(v); }
+   };
+
+
    struct Bind_Data;
 
 /**
@@ -162,6 +181,15 @@ namespace mysqlcb {
    inline void get_string_value(const Bind_Data *bd, char *buff, size_t len)
    {
       bd->bdtype->get_string_value(*bd,buff,len);
+   }
+
+   inline void t_get_string_value(IString_Callback &cb,const Bind_Data *bd)
+   {
+      size_t len = get_string_length(bd);
+      char *buff = static_cast<char*>(alloca(len+1));
+      memcpy(buff, bd->data, len);
+      buff[len]='\0';
+      cb(buff);
    }
 
    inline const char * field_name(const Bind_Data &bd) { return bd.field->name; }
