@@ -9,23 +9,6 @@
 
 namespace mysqlcb {
 
-class IString_Callback
-{
-public:
-   virtual ~IString_Callback() { }
-   virtual void operator()(const char *) const = 0;
-};
-
-template <class Func>
-class String_User : public IString_Callback
-{
-protected:
-   Func &m_f;
-public:
-   String_User(Func &f) : m_f(f) { }
-   virtual void operator()(const char *v) const { m_f(v); }
-};
-
 const char *nullstr = static_cast<const char*>(nullptr);
 
 void get_stack_string_args(IString_Callback &cb, va_list args)
