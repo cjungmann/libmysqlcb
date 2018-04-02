@@ -253,26 +253,26 @@ void summon_binder(IBinder_Callback &cb, ...)
 
    va_list counter;
    va_copy(counter, args);
-   int count = 0;
+   int num_params = 0;
    while(1)
    {
       const BaseParam &bp = va_arg(counter, BaseParam);
       if (bp.is_void())
          break;
       else
-         ++count;
+         ++num_params;
    }
    va_end(counter);
 
-   size_t memlen = count * sizeof(MYSQL_BIND);
+   size_t memlen = num_params * sizeof(MYSQL_BIND);
    MYSQL_BIND *binds = static_cast<MYSQL_BIND*>(alloca(memlen));
    memset(static_cast<void*>(binds), 0, memlen);
 
-   memlen = (count+1) * sizeof(Bind_Data);
+   memlen = (num_params+1) * sizeof(Bind_Data);
    Bind_Data *bind_data = static_cast<Bind_Data*>(alloca(memlen));
    memset(static_cast<void*>(bind_data), 0, memlen);
 
-   Binder binder = { static_cast<uint32_t>(count), nullptr, binds, bind_data };
+   Binder binder = { static_cast<uint32_t>(num_params), nullptr, binds, bind_data };
    
    MYSQL_BIND *p_bind = binds;
    Bind_Data *p_data = bind_data;
@@ -311,21 +311,21 @@ void summon_binder(IBinder_Callback &cb, const MParam *params)
    const MParam *ptr = nullptr;
 
    // Count params ahead of allocating pointer arrays:
-   uint32_t count = 0;
+   uint32_t num_params = 0;
    ptr = params;
    while (ptr++->is_valid())
-      ++count;
+      ++num_params;
 
    // Allocate arrays memory and install into a binder object:
-   size_t memlen = count * sizeof(MYSQL_BIND);
+   size_t memlen = num_params * sizeof(MYSQL_BIND);
    MYSQL_BIND *binds = static_cast<MYSQL_BIND*>(alloca(memlen));
    memset(static_cast<void*>(binds), 0, memlen);
 
-   memlen = (count+1) * sizeof(Bind_Data);
+   memlen = (num_params+1) * sizeof(Bind_Data);
    Bind_Data *bind_data = static_cast<Bind_Data*>(alloca(memlen));
    memset(static_cast<void*>(bind_data), 0, memlen);
 
-   Binder binder = {count, nullptr, binds, bind_data };
+   Binder binder = {num_params, nullptr, binds, bind_data };
    
    MYSQL_BIND *p_bind = binds;
    Bind_Data *p_data = bind_data;
