@@ -44,6 +44,8 @@ binder.o : binder.cpp mysqlcb_binder.hpp
 install:
 	install -d $(PREFIX)/lib
 	install -m 644 libmysqlcb.so* $(PREFIX)/lib
+	install -d $(PREFIX)/bin
+	install -m 777 xmlify $(PREFIX)/bin
 	install -d $(PREFIX)/include
 	install -m 644 mysqlcb_binder.hpp $(PREFIX)/include
 	install -m 644 mysqlcb.hpp $(PREFIX)/include
@@ -52,6 +54,7 @@ install:
 uninstall:
 	rm -f $(PREFIX)/lib/libmysqlcb.so
 	rm -f $(PREFIX)/lib/libmysqlcb.so.0.1
+	rm -f $(PREFIX)/bin/xmlify
 	rm -f $(PREFIX)/include/mysqlcb.hpp
 	rm -f $(PREFIX)/include/mysqlcb_binder.hpp
 
