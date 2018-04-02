@@ -63,8 +63,15 @@ void print_schema(Binder &b)
 
 bool is_int_type(const Bind_Data &data_type)
 {
-   size_t len = get_size(data_type);
+   size_t len = get_data_len(data_type);
    const char *str = static_cast<const char*>(data_type.data);
+
+   // Character at position get_data_len may or may not be '\0',
+   // the existence or lack determines the string length.
+   // This is important when we're getting the last few chars.
+   if (str[len-1]=='\0')
+      --len;
+
    return 0==strncmp("INT", &str[len-3], 3);
 }
 
@@ -82,11 +89,18 @@ bool is_set_type(const Bind_Data &data_type)
 
 bool is_unsigned_type(const Bind_Data &column_type)
 {
-   size_t len = get_size(column_type);
+   size_t len = get_data_len(column_type);
    if (len > 8)
    {
       const char *str = static_cast<const char*>(column_type.data);
-      return 0==strncmp("int", &str[len-8], 8);
+
+      // Character at position get_data_len may or may not be '\0',
+      // the existence or lack determines the string length.
+      // This is important when we're getting the last few chars.
+      if (str[len-1]=='\0')
+         --len;
+
+      return 0==strncmp("unsigned", &str[len-8], 8);
    }
    else
       return false;
@@ -140,7 +154,7 @@ void xmlify_sql_string(const char *start, const char *end=nullptr)
 void add_value_list(const Bind_Data &column_type)
 {
    const char *str = static_cast<const char *>(column_type.data);
-   const char *end = str + get_size(column_type);
+   const char *end = str + get_data_len(column_type);
 
    const char *p = str;
    const char *val = nullptr;

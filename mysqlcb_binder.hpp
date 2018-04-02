@@ -71,12 +71,13 @@ namespace mysqlcb {
  *
  * There are three methods:
  * - `stream_it()` to facilitate its use with the << operator, and
- * - 'get_size()` and `set_with_value()` save the data to memory.
- *   - Use the value from `get_size()` to allocate an appropriately-sized buffer,
+ * - 'get_data_len()` and `set_with_value()` save the data to memory.
+ *   - Use the value from `get_data_len()` to allocate an appropriately-sized buffer,
  *     then invoke `set_with_value()` with the buffer and the size of the buffer.
- *   - For fixed-length data types like numbers, `get_size()` will return
+ *   - For fixed-length data types like numbers, `get_data_len()` will return
  *     the appropriate data size.
- *   - For variable-length data types like strings, the `get_size()` will return a value
+ *   - For variable-length data types like strings, the `get_data_len()` will
+ *     return a value
  *     that is 1 greater than the length of the data.  That leaves space to terminate the
  *     string with a \0.
  */
@@ -85,7 +86,7 @@ namespace mysqlcb {
    public:
       virtual ~BDType() {}
       virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const = 0;
-      virtual size_t get_size(const Bind_Data &bd) const = 0;
+      virtual size_t get_data_len(const Bind_Data &bd) const = 0;
       virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const = 0;
       virtual enum_field_types field_type(void) const = 0;
       virtual const char *type_name(void) const = 0;
@@ -153,10 +154,10 @@ namespace mysqlcb {
    inline bool valid(const Bind_Data &bd) { return bd.field != nullptr; }
    inline bool valid(const Bind_Data *bd) { return bd->field != nullptr; }
    inline bool is_unsupported_type(const Bind_Data& bd) { return bd.bdtype==nullptr; }
-   inline uint32_t required_buffer_size(const Bind_Data& bd) { return bd.bdtype->get_size(bd); }
+   inline uint32_t required_buffer_size(const Bind_Data& bd) { return bd.bdtype->get_data_len(bd); }
 
-   inline size_t get_size(const Bind_Data &bd) { return bd.bdtype->get_size(bd); }
-   inline size_t get_size(const Bind_Data *bd) { return bd->bdtype->get_size(*bd); }
+   inline size_t get_data_len(const Bind_Data &bd) { return bd.bdtype->get_data_len(bd); }
+   inline size_t get_data_len(const Bind_Data *bd) { return bd->bdtype->get_data_len(*bd); }
    inline void set_with_value(const Bind_Data &bd, void *buff, size_t len_buff)
    {
       bd.bdtype->set_with_value(bd, buff, len_buff);
@@ -222,10 +223,10 @@ namespace mysqlcb {
 // inline const BDType& get_streamable(const Binder &b, int index) { return get_bdtype(b,index); }
 // inline bool is_null(const Binder &b, int index) { return get_bind_data(b,index).is_null; }
 // inline const char *type_name(const Binder &b, int index) { return get_bdtype(b,index).type_name(); }
-// inline const size_t get_size(const Binder &b, int index)
+// inline const size_t get_data_len(const Binder &b, int index)
 // {
 //    const Bind_Data &bd = get_bind_data(b,index);
-//    return bd.bdtype->get_size(bd);
+//    return bd.bdtype->get_data_len(bd);
 // }
 // inline void set_with_value(const Binder &b, int index, void *buff, size_t len)
 // {
@@ -256,7 +257,7 @@ namespace mysqlcb {
          os << *static_cast<T*>(bd.data);
          return os;
       }
-      inline virtual size_t get_size(const Bind_Data &bd) const
+      inline virtual size_t get_data_len(const Bind_Data &bd) const
       {
          return sizeof(T);
       }
@@ -330,7 +331,7 @@ namespace mysqlcb {
    public:
       BD_DateBase(const char *tname) : BDBase<ftype>(tname) { }
       inline virtual std::ostream& stream_it(std::ostream &os, const Bind_Data &bd) const=0;
-      inline virtual size_t get_size(const Bind_Data &bd) const {return sizeof(MYSQL_TIME);}
+      inline virtual size_t get_data_len(const Bind_Data &bd) const {return sizeof(MYSQL_TIME);}
       inline virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const
       {
          memcpy(buff, bd.data, sizeof(MYSQL_TIME));
@@ -433,9 +434,9 @@ namespace mysqlcb {
          return os;
       }
 
-      inline virtual size_t get_size(const Bind_Data &bd) const
+      inline virtual size_t get_data_len(const Bind_Data &bd) const
       {
-         return bd.len_data+1;
+         return bd.len_data;
       }
       inline virtual void set_with_value(const Bind_Data &bd, void* buff, size_t len) const
       {
@@ -479,7 +480,7 @@ namespace mysqlcb {
       bool is_void(void) const                { return m_data==nullptr && m_type==nullptr; }
 
       size_t       len(void) const            { return m_len; }
-      size_t  get_size(void) const            { return m_len; }
+      size_t  get_data_len(void) const        { return m_len; }
       const void*  data(void) const           { return m_data; }
       const BDType &type(void) const          { return *m_type; }
       enum_field_types field_type(void) const { return m_type->field_type(); }

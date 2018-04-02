@@ -162,7 +162,7 @@ void set_bind_values(MYSQL_BIND &b, const BaseParam &param)
 
    b.buffer_type = param.field_type();
    b.is_unsigned = param.is_unsigned();
-   *(b.length) = param.get_size();
+   *(b.length) = param.get_data_len();
 }
 
 void set_bind_values(MYSQL_BIND &b, const MParam *param)
@@ -288,7 +288,7 @@ void summon_binder(IBinder_Callback &cb, ...)
          p_data->bind = p_bind;
 
          // uint32_t buffer_length = get_buffer_size(fields[i]);
-         uint32_t buffer_length = param.get_size();
+         uint32_t buffer_length = param.get_data_len();
 
          // alloca must be in this scope to persist until callback:
          void *data = alloca(buffer_length);

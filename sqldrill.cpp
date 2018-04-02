@@ -76,7 +76,7 @@ void summon_list(ILlist_Callback &cb, const PullPack &pp)
    while (pp.puller(false))
    {
       // Copy string to stack memory
-      bufflen = get_size(bd);
+      bufflen = get_data_len(bd);
       buffer = alloca(bufflen);
       set_with_value(bd, buffer, bufflen);
 
