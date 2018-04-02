@@ -184,21 +184,21 @@ void set_bind_data_object_pointers(Bind_Data &bd, MYSQL_FIELD &field, MYSQL_BIND
 
 void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt)
 {
-   uint32_t fcount = mysql_stmt_field_count(stmt);
-   if (fcount)
+   uint32_t num_fields = mysql_stmt_field_count(stmt);
+   if (num_fields)
    {
       MYSQL_RES *result = mysql_stmt_result_metadata(stmt);
       if (result)
       {
          MYSQL_FIELD *fields = mysql_fetch_fields(result);
-         MYSQL_BIND  *binds = static_cast<MYSQL_BIND*>(alloca(sizeof(MYSQL_BIND) * fcount));
+         MYSQL_BIND  *binds = static_cast<MYSQL_BIND*>(alloca(sizeof(MYSQL_BIND) * num_fields));
          // Make one extra Bind_Data element, set to NULL, to signal the end of the list.
-         Bind_Data   *bdata = static_cast<Bind_Data*>(alloca(sizeof(Bind_Data) * (fcount+1)));
+         Bind_Data   *bdata = static_cast<Bind_Data*>(alloca(sizeof(Bind_Data) * (num_fields+1)));
 
-         memset(binds, 0, sizeof(MYSQL_BIND)*fcount);
-         memset(bdata, 0, sizeof(Bind_Data)*(fcount+1));
+         memset(binds, 0, sizeof(MYSQL_BIND)*num_fields);
+         memset(bdata, 0, sizeof(Bind_Data)*(num_fields+1));
 
-         for (uint32_t i=0; i<fcount; ++i)
+         for (uint32_t i=0; i<num_fields; ++i)
          {
             Bind_Data  &bdataInst = bdata[i];
             MYSQL_FIELD &field = fields[i];
@@ -234,7 +234,7 @@ void get_result_binds(MYSQL &mysql, IBinder_Callback &cb, MYSQL_STMT *stmt)
             bind.buffer_length = buffer_length;
          }
 
-         Binder b = { fcount, fields, binds, bdata };
+         Binder b = { num_fields, fields, binds, bdata };
          cb(b);
 
          mysql_free_result(result);
