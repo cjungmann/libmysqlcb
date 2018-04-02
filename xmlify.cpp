@@ -329,7 +329,11 @@ void show_usage(void)
       "\n"
       "The options can go before or after the required database name.\n"
       "\n"
-      "In practice, the -e option is required for output.\n";
+      "Examples:\n"
+      "\nRun query \"SELECT * FROM Person\" in database \"TheDB\"\nusing explicit MySQL authorization:\n\n"
+      "xmlify -u root -prootpassword -h localhost -e \"SELECT * FROM Person\" TheDB\n"
+      "\n\nShow schema of the table \"Person\" from the database \"TheDB\"\nusing default MySQL authorization:\n\n"
+      "xmlify -t Person TheDB\n";
 }
 
 int main(int argc, char **argv)
