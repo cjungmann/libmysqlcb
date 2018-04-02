@@ -7,10 +7,16 @@ As a learning project, it is limited in its scope.  It includes only three funct
 - execute_query_pull
 - start_mysql
 
-All of the functions perform their task and invoke a callback function in the argument list.
-The callback functions are expected, but not required to be lambda functions, and much of the
-include file, `mysqlcb.hpp`, is actually templates for wrapping lambda functions to allow them
-to be recognized as types for parameter matching.
+All of the functions perform their task and invoke a callback function in the argument
+list.  The callback functions are expected, but not required to be lambda functions,
+and much of the include file, `mysqlcb.hpp`, is actually templates for wrapping lambda
+functions to allow them to be recognized as types for parameter matching.
+
+## *xmlify* Utility
+
+With the added feature of simple output of table schemas, The [xmlify](xmlify.md)
+utility now includes its own documentation page and has become useful in another
+project, [gensfw](https://github.com/cjungmann/gensfw).
 
 ### execute_query
 
